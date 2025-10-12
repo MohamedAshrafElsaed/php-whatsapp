@@ -16,14 +16,61 @@ defineProps<Props>();
     <svg
         :class="className"
         v-bind="$attrs"
-        viewBox="0 0 40 42"
+        viewBox="0 0 166 166"
         xmlns="http://www.w3.org/2000/svg"
     >
+        <!-- Gradient definitions -->
+        <defs>
+            <linearGradient id="bgGradient" x1="0" y1="0" x2="166" y2="166">
+                <stop offset="0%" stop-color="#25D366"/>
+                <stop offset="100%" stop-color="#128C7E"/>
+            </linearGradient>
+            <linearGradient id="bubbleGradient" x1="0" y1="0" x2="100" y2="100">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="100%" stop-color="#f0f0f0"/>
+            </linearGradient>
+        </defs>
+
+        <!-- Background -->
+        <rect width="166" height="166" rx="32" fill="url(#bgGradient)"/>
+
+        <!-- Main message bubble -->
         <path
-            clip-rule="evenodd"
-            d="M17.2 5.633 8.6.855 0 5.633v26.51l16.2 9 16.2-9v-8.442l7.6-4.223V9.856l-8.6-4.777-8.6 4.777V18.3l-5.6 3.111V5.633ZM38 18.301l-5.6 3.11v-6.157l5.6-3.11V18.3Zm-1.06-7.856-5.54 3.078-5.54-3.079 5.54-3.078 5.54 3.079ZM24.8 18.3v-6.157l5.6 3.111v6.158L24.8 18.3Zm-1 1.732 5.54 3.078-13.14 7.302-5.54-3.078 13.14-7.3v-.002Zm-16.2 7.89 7.6 4.222V38.3L2 30.966V7.92l5.6 3.111v16.892ZM8.6 9.3 3.06 6.222 8.6 3.143l5.54 3.08L8.6 9.3Zm21.8 15.51-13.2 7.334V38.3l13.2-7.334v-6.156ZM9.6 11.034l5.6-3.11v14.6l-5.6 3.11v-14.6Z"
-            fill="currentColor"
-            fill-rule="evenodd"
+            d="M45 55C45 48.3726 50.3726 43 57 43H109C115.627 43 121 48.3726 121 55V95C121 101.627 115.627 107 109 107H95L83 120L71 107H57C50.3726 107 45 101.627 45 95V55Z"
+            fill="url(#bubbleGradient)"
+            stroke="white"
+            stroke-width="2"
+        />
+
+        <!-- Message lines with animation feel -->
+        <rect x="55" y="60" width="56" height="6" rx="3" fill="#25D366" opacity="0.9"/>
+        <rect x="55" y="72" width="46" height="6" rx="3" fill="#25D366" opacity="0.7"/>
+        <rect x="55" y="84" width="36" height="6" rx="3" fill="#25D366" opacity="0.5"/>
+
+        <!-- Send icon -->
+        <path d="M100 91L111 85L100 79V85L105 87.5L100 91Z" fill="#128C7E"/>
+
+        <!-- Connection lines -->
+        <path
+            d="M116 65L122 45"
+            stroke="white"
+            stroke-width="2"
+            stroke-opacity="0.3"
+            stroke-dasharray="4 4"
+        />
+        <path
+            d="M118 82L128 78"
+            stroke="white"
+            stroke-width="2"
+            stroke-opacity="0.3"
+            stroke-dasharray="4 4"
+        />
+        <path
+            d="M112 100L123 105"
+            stroke="white"
+            stroke-width="2"
+            stroke-opacity="0.3"
+            stroke-dasharray="4 4"
         />
     </svg>
 </template>
