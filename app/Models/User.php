@@ -46,4 +46,40 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+
+    public function waSession(): HasOne
+    {
+        return $this->hasOne(WaSession::class)->latestOfMany();
+    }
+
+    public function waSessions(): HasMany
+    {
+        return $this->hasMany(WaSession::class);
+    }
+
+    public function imports(): HasMany
+    {
+        return $this->hasMany(Import::class);
+    }
+
+    public function recipients(): HasMany
+    {
+        return $this->hasMany(Recipient::class);
+    }
+
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
 }

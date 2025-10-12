@@ -34,5 +34,8 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
+    'bridge' => [
+        'url' => env('BRIDGE_BASE_URL', 'http://localhost:3000'),
+        'token' => env('BRIDGE_TOKEN', 'your-secret-token'),
+    ],
 ];
