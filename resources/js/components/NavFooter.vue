@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {
     SidebarGroup,
     SidebarGroupContent,
@@ -25,13 +25,13 @@ defineProps<Props>();
             <SidebarMenu>
                 <SidebarMenuItem v-for="item in items" :key="item.title">
                     <SidebarMenuButton
-                        class="text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
                         as-child
+                        class="text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
                     >
                         <a
                             :href="toUrl(item.href)"
-                            target="_blank"
                             rel="noopener noreferrer"
+                            target="_blank"
                         >
                             <component :is="item.icon" />
                             <span>{{ item.title }}</span>

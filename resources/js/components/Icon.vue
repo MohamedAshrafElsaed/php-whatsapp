@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import { cn } from '@/lib/utils';
 import * as icons from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -29,8 +29,8 @@ const icon = computed(() => {
     <component
         :is="icon"
         :class="className"
+        :color="color"
         :size="size"
         :stroke-width="strokeWidth"
-        :color="color"
     />
 </template>

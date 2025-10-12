@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -35,8 +35,8 @@ const currentPath = typeof window !== undefined ? window.location.pathname : '';
 <template>
     <div class="px-4 py-6">
         <Heading
-            title="Settings"
             description="Manage your profile and account settings"
+            title="Settings"
         />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
@@ -45,12 +45,12 @@ const currentPath = typeof window !== undefined ? window.location.pathname : '';
                     <Button
                         v-for="item in sidebarNavItems"
                         :key="toUrl(item.href)"
-                        variant="ghost"
                         :class="[
                             'w-full justify-start',
                             { 'bg-muted': urlIsActive(item.href, currentPath) },
                         ]"
                         as-child
+                        variant="ghost"
                     >
                         <Link :href="item.href">
                             <component :is="item.icon" class="h-4 w-4" />

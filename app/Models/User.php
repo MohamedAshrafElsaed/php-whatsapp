@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -35,6 +37,62 @@ class User extends Authenticatable
     ];
 
     /**
+     * @return HasOne
+     */
+    public function waSession(): HasOne
+    {
+        return $this->hasOne(WaSession::class)->latestOfMany();
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function waSessions(): HasMany
+    {
+        return $this->hasMany(WaSession::class);
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function imports(): HasMany
+    {
+        return $this->hasMany(Import::class);
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function recipients(): HasMany
+    {
+        return $this->hasMany(Recipient::class);
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    /**
+     * @return HasMany
+     */
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -45,41 +103,5 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }
-
-
-    public function waSession(): HasOne
-    {
-        return $this->hasOne(WaSession::class)->latestOfMany();
-    }
-
-    public function waSessions(): HasMany
-    {
-        return $this->hasMany(WaSession::class);
-    }
-
-    public function imports(): HasMany
-    {
-        return $this->hasMany(Import::class);
-    }
-
-    public function recipients(): HasMany
-    {
-        return $this->hasMany(Recipient::class);
-    }
-
-    public function campaigns(): HasMany
-    {
-        return $this->hasMany(Campaign::class);
-    }
-
-    public function messages(): HasMany
-    {
-        return $this->hasMany(Message::class);
-    }
-
-    public function auditLogs(): HasMany
-    {
-        return $this->hasMany(AuditLog::class);
     }
 }

@@ -27,7 +27,7 @@ class WaSessionFactory extends Factory
 
     public function connected(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'connected',
             'last_seen_at' => now(),
             'expires_at' => now()->addDays(30),
@@ -36,7 +36,7 @@ class WaSessionFactory extends Factory
 
     public function pending(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'pending',
             'meta_json' => [
                 'qr_base64' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',

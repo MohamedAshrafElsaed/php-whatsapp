@@ -1,10 +1,10 @@
-<script setup lang="ts">
-import { Button } from '@/components/ui/button';
+<script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, ref } from 'vue';
 import axios from 'axios';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 interface Session {
     id: number;
@@ -101,14 +101,20 @@ onUnmounted(() => {
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-semibold">Connection Status</h2>
-                        <Badge :variant="statusColor[currentSession.status]" class="mt-2">
+                        <Badge
+                            :variant="statusColor[currentSession.status]"
+                            class="mt-2"
+                        >
                             {{ currentSession.status.toUpperCase() }}
                         </Badge>
                     </div>
 
                     <!-- Connected Account Info -->
                     <div
-                        v-if="currentSession.status === 'connected' && currentSession.meta_json"
+                        v-if="
+                            currentSession.status === 'connected' &&
+                            currentSession.meta_json
+                        "
                         class="flex items-center gap-3"
                     >
                         <img
@@ -117,7 +123,9 @@ onUnmounted(() => {
                             class="h-12 w-12 rounded-full"
                         />
                         <div>
-                            <div class="font-medium">{{ currentSession.meta_json.name }}</div>
+                            <div class="font-medium">
+                                {{ currentSession.meta_json.name }}
+                            </div>
                             <div class="text-sm text-muted-foreground">
                                 {{ currentSession.meta_json.phone }}
                             </div>
@@ -126,13 +134,20 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Last Seen -->
-                <div v-if="currentSession.last_seen_at" class="mt-4 text-sm text-muted-foreground">
-                    Last seen: {{ new Date(currentSession.last_seen_at).toLocaleString() }}
+                <div
+                    v-if="currentSession.last_seen_at"
+                    class="mt-4 text-sm text-muted-foreground"
+                >
+                    Last seen:
+                    {{ new Date(currentSession.last_seen_at).toLocaleString() }}
                 </div>
             </div>
 
             <!-- Instructions -->
-            <div v-if="!currentSession || currentSession.status !== 'connected'" class="space-y-4">
+            <div
+                v-if="!currentSession || currentSession.status !== 'connected'"
+                class="space-y-4"
+            >
                 <div class="rounded-lg bg-muted p-6">
                     <h3 class="mb-3 font-semibold">How to Connect:</h3>
                     <ol class="list-decimal space-y-2 pl-5">
@@ -145,7 +160,10 @@ onUnmounted(() => {
 
                 <!-- QR Code -->
                 <div
-                    v-if="currentSession?.status === 'pending' && currentSession?.meta_json?.qr_base64"
+                    v-if="
+                        currentSession?.status === 'pending' &&
+                        currentSession?.meta_json?.qr_base64
+                    "
                     class="flex flex-col items-center space-y-4 rounded-lg border p-6"
                 >
                     <h3 class="font-semibold">Scan QR Code</h3>
@@ -162,9 +180,12 @@ onUnmounted(() => {
                 <!-- Connect Button -->
                 <div class="flex justify-center">
                     <Button
-                        v-if="!currentSession || currentSession.status === 'disconnected'"
-                        @click="connectWhatsApp"
+                        v-if="
+                            !currentSession ||
+                            currentSession.status === 'disconnected'
+                        "
                         size="lg"
+                        @click="connectWhatsApp"
                     >
                         Generate QR Code
                     </Button>
@@ -175,16 +196,16 @@ onUnmounted(() => {
             <div class="flex gap-3">
                 <Button
                     v-if="currentSession?.status === 'expired'"
-                    @click="refreshQr"
                     variant="outline"
+                    @click="refreshQr"
                 >
                     Refresh QR Code
                 </Button>
 
                 <Button
                     v-if="currentSession?.status === 'connected'"
-                    @click="disconnect"
                     variant="destructive"
+                    @click="disconnect"
                 >
                     Disconnect
                 </Button>

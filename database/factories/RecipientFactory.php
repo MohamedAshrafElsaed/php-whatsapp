@@ -34,7 +34,7 @@ class RecipientFactory extends Factory
 
     public function invalid(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'phone_e164' => null,
             'is_valid' => false,
             'validation_errors_json' => ['phone' => 'Invalid phone number format'],

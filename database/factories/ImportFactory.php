@@ -28,7 +28,7 @@ class ImportFactory extends Factory
 
     public function ready(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'ready',
             'valid_rows' => fake()->numberBetween(50, 100),
         ]);

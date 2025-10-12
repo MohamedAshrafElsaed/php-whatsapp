@@ -1,6 +1,6 @@
-<script setup lang="ts">
-import { Button } from '@/components/ui/button';
+<script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 
@@ -47,19 +47,25 @@ const goBack = () => {
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
-                    <Button @click="goBack" variant="ghost" size="sm" class="mb-2">
+                    <Button
+                        class="mb-2"
+                        size="sm"
+                        variant="ghost"
+                        @click="goBack"
+                    >
                         ← Back to Imports
                     </Button>
                     <h1 class="text-2xl font-bold">{{ import.filename }}</h1>
                     <p class="text-muted-foreground">
-                        Uploaded {{ new Date(import.created_at).toLocaleDateString() }}
+                        Uploaded
+                        {{ new Date(import.created_at).toLocaleDateString() }}
                     </p>
                 </div>
 
                 <Button
                     v-if="import.status === 'ready' && import.valid_rows > 0"
-                    @click="createCampaign"
                     size="lg"
+                    @click="createCampaign"
                 >
                     Use in Campaign
                 </Button>
@@ -68,7 +74,9 @@ const goBack = () => {
             <!-- Summary Cards -->
             <div class="grid gap-4 md:grid-cols-3">
                 <div class="rounded-lg border p-6">
-                    <div class="text-2xl font-bold">{{ import.total_rows }}</div>
+                    <div class="text-2xl font-bold">
+                        {{ import.total_rows }}
+                    </div>
                     <div class="text-sm text-muted-foreground">Total Rows</div>
                 </div>
 
@@ -76,64 +84,102 @@ const goBack = () => {
                     <div class="text-2xl font-bold text-green-600">
                         {{ import.valid_rows }}
                     </div>
-                    <div class="text-sm text-muted-foreground">Valid Contacts</div>
+                    <div class="text-sm text-muted-foreground">
+                        Valid Contacts
+                    </div>
                 </div>
 
                 <div class="rounded-lg border p-6">
                     <div class="text-2xl font-bold text-red-600">
                         {{ import.invalid_rows }}
                     </div>
-                    <div class="text-sm text-muted-foreground">Invalid Contacts</div>
+                    <div class="text-sm text-muted-foreground">
+                        Invalid Contacts
+                    </div>
                 </div>
             </div>
 
             <!-- Recipients Preview -->
             <div class="rounded-lg border">
                 <div class="border-b p-4">
-                    <h2 class="text-lg font-semibold">Recipients Preview (First 50)</h2>
+                    <h2 class="text-lg font-semibold">
+                        Recipients Preview (First 50)
+                    </h2>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="border-b bg-muted/50">
-                        <tr>
-                            <th class="p-4 text-left font-medium">Status</th>
-                            <th class="p-4 text-left font-medium">Phone</th>
-                            <th class="p-4 text-left font-medium">Name</th>
-                            <th class="p-4 text-left font-medium">Email</th>
-                            <th class="p-4 text-left font-medium">Errors</th>
-                        </tr>
+                            <tr>
+                                <th class="p-4 text-left font-medium">
+                                    Status
+                                </th>
+                                <th class="p-4 text-left font-medium">Phone</th>
+                                <th class="p-4 text-left font-medium">Name</th>
+                                <th class="p-4 text-left font-medium">Email</th>
+                                <th class="p-4 text-left font-medium">
+                                    Errors
+                                </th>
+                            </tr>
                         </thead>
                         <tbody>
-                        <tr
-                            v-for="recipient in recipients"
-                            :key="recipient.id"
-                            class="border-b hover:bg-muted/30"
-                        >
-                            <td class="p-4">
-                                <Badge :variant="recipient.is_valid ? 'success' : 'destructive'">
-                                    {{ recipient.is_valid ? 'Valid' : 'Invalid' }}
-                                </Badge>
-                            </td>
-                            <td class="p-4 font-mono text-sm">
-                                {{ recipient.phone_e164 || recipient.phone_raw }}
-                            </td>
-                            <td class="p-4">
-                                {{ [recipient.first_name, recipient.last_name].filter(Boolean).join(' ') || '-' }}
-                            </td>
-                            <td class="p-4 text-sm text-muted-foreground">
-                                {{ recipient.email || '-' }}
-                            </td>
-                            <td class="p-4">
+                            <tr
+                                v-for="recipient in recipients"
+                                :key="recipient.id"
+                                class="border-b hover:bg-muted/30"
+                            >
+                                <td class="p-4">
+                                    <Badge
+                                        :variant="
+                                            recipient.is_valid
+                                                ? 'success'
+                                                : 'destructive'
+                                        "
+                                    >
+                                        {{
+                                            recipient.is_valid
+                                                ? 'Valid'
+                                                : 'Invalid'
+                                        }}
+                                    </Badge>
+                                </td>
+                                <td class="p-4 font-mono text-sm">
+                                    {{
+                                        recipient.phone_e164 ||
+                                        recipient.phone_raw
+                                    }}
+                                </td>
+                                <td class="p-4">
+                                    {{
+                                        [
+                                            recipient.first_name,
+                                            recipient.last_name,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ') || '-'
+                                    }}
+                                </td>
+                                <td class="p-4 text-sm text-muted-foreground">
+                                    {{ recipient.email || '-' }}
+                                </td>
+                                <td class="p-4">
                                     <span
                                         v-if="recipient.validation_errors_json"
                                         class="text-sm text-red-600"
                                     >
-                                        {{ recipient.validation_errors_json.join(', ') }}
+                                        {{
+                                            recipient.validation_errors_json.join(
+                                                ', ',
+                                            )
+                                        }}
                                     </span>
-                                <span v-else class="text-sm text-muted-foreground">-</span>
-                            </td>
-                        </tr>
+                                    <span
+                                        v-else
+                                        class="text-sm text-muted-foreground"
+                                        >-</span
+                                    >
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

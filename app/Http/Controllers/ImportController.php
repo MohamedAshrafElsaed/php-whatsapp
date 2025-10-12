@@ -27,7 +27,7 @@ class ImportController extends Controller
             ->latest()
             ->paginate(20);
 
-        return Inertia::render('Contacts/Imports/Index', [
+        return Inertia::render('contacts/imports/Index', [
             'imports' => $imports,
         ]);
     }
@@ -107,40 +107,6 @@ class ImportController extends Controller
             return redirect()->route('imports.index')
                 ->with('error', 'Import failed: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Show import details
-     */
-    public function show(Request $request, Import $import): Response
-    {
-        $this->authorize('view', $import);
-
-        $recipients = $import->recipients()
-            ->latest()
-            ->limit(50)
-            ->get();
-
-        return Inertia::render('Contacts/Imports/Show', [
-            'import' => $import->load('user'),
-            'recipients' => $recipients,
-        ]);
-    }
-
-    /**
-     * Delete import
-     */
-    public function destroy(Request $request, Import $import): RedirectResponse
-    {
-        $this->authorize('delete', $import);
-
-        $import->update(['status' => 'deleted']);
-        $import->delete();
-
-        AuditLog::log('deleted', 'Import', $import->id);
-
-        return redirect()->route('imports.index')
-            ->with('success', 'Import deleted successfully.');
     }
 
     /**
@@ -248,5 +214,39 @@ class ImportController extends Controller
             'invalid' => $invalidRows,
             'recipients' => $recipients,
         ];
+    }
+
+    /**
+     * Show import details
+     */
+    public function show(Request $request, Import $import): Response
+    {
+        $this->authorize('view', $import);
+
+        $recipients = $import->recipients()
+            ->latest()
+            ->limit(50)
+            ->get();
+
+        return Inertia::render('contacts/imports/Show', [
+            'import' => $import->load('user'),
+            'recipients' => $recipients,
+        ]);
+    }
+
+    /**
+     * Delete import
+     */
+    public function destroy(Request $request, Import $import): RedirectResponse
+    {
+        $this->authorize('delete', $import);
+
+        $import->update(['status' => 'deleted']);
+        $import->delete();
+
+        AuditLog::log('deleted', 'Import', $import->id);
+
+        return redirect()->route('imports.index')
+            ->with('success', 'Import deleted successfully.');
     }
 }

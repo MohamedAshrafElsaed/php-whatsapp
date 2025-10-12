@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
@@ -39,42 +39,42 @@ const user = page.props.auth.user;
         <SettingsLayout>
             <div class="flex flex-col space-y-6">
                 <HeadingSmall
-                    title="Profile information"
                     description="Update your name and email address"
+                    title="Profile information"
                 />
 
                 <Form
-                    v-bind="ProfileController.update.form()"
-                    class="space-y-6"
                     v-slot="{ errors, processing, recentlySuccessful }"
+                    class="space-y-6"
+                    v-bind="ProfileController.update.form()"
                 >
                     <div class="grid gap-2">
                         <Label for="name">Name</Label>
                         <Input
                             id="name"
+                            :default-value="user.name"
+                            autocomplete="name"
                             class="mt-1 block w-full"
                             name="name"
-                            :default-value="user.name"
-                            required
-                            autocomplete="name"
                             placeholder="Full name"
+                            required
                         />
-                        <InputError class="mt-2" :message="errors.name" />
+                        <InputError :message="errors.name" class="mt-2" />
                     </div>
 
                     <div class="grid gap-2">
                         <Label for="email">Email address</Label>
                         <Input
                             id="email"
-                            type="email"
+                            :default-value="user.email"
+                            autocomplete="username"
                             class="mt-1 block w-full"
                             name="email"
-                            :default-value="user.email"
-                            required
-                            autocomplete="username"
                             placeholder="Email address"
+                            required
+                            type="email"
                         />
-                        <InputError class="mt-2" :message="errors.email" />
+                        <InputError :message="errors.email" class="mt-2" />
                     </div>
 
                     <div v-if="mustVerifyEmail && !user.email_verified_at">
@@ -102,8 +102,8 @@ const user = page.props.auth.user;
                         <Button
                             :disabled="processing"
                             data-test="update-profile-button"
-                            >Save</Button
-                        >
+                            >Save
+                        </Button>
 
                         <Transition
                             enter-active-class="transition ease-in-out"

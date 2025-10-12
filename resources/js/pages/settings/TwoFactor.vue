@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import TwoFactorRecoveryCodes from '@/components/TwoFactorRecoveryCodes.vue';
 import TwoFactorSetupModal from '@/components/TwoFactorSetupModal.vue';
@@ -44,8 +44,8 @@ onUnmounted(() => {
         <SettingsLayout>
             <div class="space-y-6">
                 <HeadingSmall
-                    title="Two-Factor Authentication"
                     description="Manage your two-factor authentication settings"
+                    title="Two-Factor Authentication"
                 />
 
                 <div
@@ -66,18 +66,20 @@ onUnmounted(() => {
                             v-if="hasSetupData"
                             @click="showSetupModal = true"
                         >
-                            <ShieldCheck />Continue Setup
+                            <ShieldCheck />
+                            Continue Setup
                         </Button>
                         <Form
                             v-else
+                            #default="{ processing }"
                             v-bind="enable.form()"
                             @success="showSetupModal = true"
-                            #default="{ processing }"
                         >
-                            <Button type="submit" :disabled="processing">
-                                <ShieldCheck />Enable 2FA</Button
-                            ></Form
-                        >
+                            <Button :disabled="processing" type="submit">
+                                <ShieldCheck />
+                                Enable 2FA
+                            </Button>
+                        </Form>
                     </div>
                 </div>
 
@@ -97,11 +99,11 @@ onUnmounted(() => {
                     <TwoFactorRecoveryCodes />
 
                     <div class="relative inline">
-                        <Form v-bind="disable.form()" #default="{ processing }">
+                        <Form #default="{ processing }" v-bind="disable.form()">
                             <Button
-                                variant="destructive"
-                                type="submit"
                                 :disabled="processing"
+                                type="submit"
+                                variant="destructive"
                             >
                                 <ShieldBan />
                                 Disable 2FA

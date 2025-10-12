@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import PasswordResetLinkController from '@/actions/App/Http/Controllers/Auth/PasswordResetLinkController';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -17,8 +17,8 @@ defineProps<{
 
 <template>
     <AuthLayout
-        title="Forgot password"
         description="Enter your email to receive a password reset link"
+        title="Forgot password"
     >
         <Head title="Forgot password" />
 
@@ -31,26 +31,26 @@ defineProps<{
 
         <div class="space-y-6">
             <Form
-                v-bind="PasswordResetLinkController.store.form()"
                 v-slot="{ errors, processing }"
+                v-bind="PasswordResetLinkController.store.form()"
             >
                 <div class="grid gap-2">
                     <Label for="email">Email address</Label>
                     <Input
                         id="email"
-                        type="email"
-                        name="email"
                         autocomplete="off"
                         autofocus
+                        name="email"
                         placeholder="email@example.com"
+                        type="email"
                     />
                     <InputError :message="errors.email" />
                 </div>
 
                 <div class="my-6 flex items-center justify-start">
                     <Button
-                        class="w-full"
                         :disabled="processing"
+                        class="w-full"
                         data-test="email-password-reset-link-button"
                     >
                         <LoaderCircle

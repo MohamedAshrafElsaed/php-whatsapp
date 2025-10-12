@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\WaSessionController;
 use Illuminate\Support\Facades\Route;
@@ -9,10 +10,10 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
+// Dashboard Route - Now uses controller for statistics
+Route::get('dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 // WhatsApp Connection Routes
 Route::middleware(['auth'])->prefix('wa')->name('wa.')->group(function () {
@@ -31,7 +32,6 @@ Route::middleware(['auth'])->prefix('contacts')->name('imports.')->group(functio
     Route::get('/imports/{import}', [ImportController::class, 'show'])->name('show');
     Route::delete('/imports/{import}', [ImportController::class, 'destroy'])->name('destroy');
 });
-
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';

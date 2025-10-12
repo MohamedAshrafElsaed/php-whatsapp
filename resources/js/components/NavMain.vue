@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -23,9 +23,9 @@ const page = usePage();
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
-                    as-child
                     :is-active="urlIsActive(item.href, page.url)"
                     :tooltip="item.title"
+                    as-child
                 >
                     <Link :href="item.href">
                         <component :is="item.icon" />

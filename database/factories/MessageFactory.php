@@ -29,7 +29,7 @@ class MessageFactory extends Factory
 
     public function sent(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'sent',
             'sent_at' => now(),
         ]);
@@ -37,7 +37,7 @@ class MessageFactory extends Factory
 
     public function failed(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'failed',
             'error_code' => 'INVALID_PHONE',
             'error_message' => 'Invalid phone number',

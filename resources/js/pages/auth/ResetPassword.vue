@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import NewPasswordController from '@/actions/App/Http/Controllers/Auth/NewPasswordController';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -19,28 +19,28 @@ const inputEmail = ref(props.email);
 
 <template>
     <AuthLayout
-        title="Reset password"
         description="Please enter your new password below"
+        title="Reset password"
     >
         <Head title="Reset password" />
 
         <Form
-            v-bind="NewPasswordController.store.form()"
-            :transform="(data) => ({ ...data, token, email })"
-            :reset-on-success="['password', 'password_confirmation']"
             v-slot="{ errors, processing }"
+            :reset-on-success="['password', 'password_confirmation']"
+            :transform="(data) => ({ ...data, token, email })"
+            v-bind="NewPasswordController.store.form()"
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="email">Email</Label>
                     <Input
                         id="email"
-                        type="email"
-                        name="email"
-                        autocomplete="email"
                         v-model="inputEmail"
+                        autocomplete="email"
                         class="mt-1 block w-full"
+                        name="email"
                         readonly
+                        type="email"
                     />
                     <InputError :message="errors.email" class="mt-2" />
                 </div>
@@ -49,12 +49,12 @@ const inputEmail = ref(props.email);
                     <Label for="password">Password</Label>
                     <Input
                         id="password"
-                        type="password"
-                        name="password"
                         autocomplete="new-password"
-                        class="mt-1 block w-full"
                         autofocus
+                        class="mt-1 block w-full"
+                        name="password"
                         placeholder="Password"
+                        type="password"
                     />
                     <InputError :message="errors.password" />
                 </div>
@@ -65,20 +65,20 @@ const inputEmail = ref(props.email);
                     </Label>
                     <Input
                         id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
                         autocomplete="new-password"
                         class="mt-1 block w-full"
+                        name="password_confirmation"
                         placeholder="Confirm password"
+                        type="password"
                     />
                     <InputError :message="errors.password_confirmation" />
                 </div>
 
                 <Button
-                    type="submit"
-                    class="mt-4 w-full"
                     :disabled="processing"
+                    class="mt-4 w-full"
                     data-test="reset-password-button"
+                    type="submit"
                 >
                     <LoaderCircle
                         v-if="processing"

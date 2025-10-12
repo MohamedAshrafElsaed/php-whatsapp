@@ -9,6 +9,7 @@ All files are provided with **full logic** - no placeholders. Copy each file exa
 ## 📁 Files to CREATE
 
 ### Migrations (database/migrations/)
+
 Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 
 1. **`YYYY_MM_DD_000001_create_wa_sessions_table.php`**
@@ -19,6 +20,7 @@ Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 6. **`YYYY_MM_DD_000006_create_audit_logs_table.php`**
 
 ### Models (app/Models/)
+
 7. **`WaSession.php`** - WhatsApp session with status helpers
 8. **`Import.php`** - Contact import record
 9. **`Recipient.php`** - Individual contact
@@ -27,6 +29,7 @@ Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 12. **`AuditLog.php`** - Activity log with static helper
 
 ### Policies (app/Policies/)
+
 13. **`WaSessionPolicy.php`** - User-scoped access
 14. **`ImportPolicy.php`** - User-scoped access
 15. **`RecipientPolicy.php`** - User-scoped access
@@ -35,6 +38,7 @@ Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 18. **`AuditLogPolicy.php`** - User-scoped access
 
 ### Factories (database/factories/)
+
 19. **`WaSessionFactory.php`** - With connected/pending states
 20. **`ImportFactory.php`** - With ready state
 21. **`RecipientFactory.php`** - With invalid state
@@ -43,19 +47,24 @@ Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 24. **`AuditLogFactory.php`** - Activity records
 
 ### Seeders (database/seeders/)
+
 25. **`DemoSeeder.php`** - Complete demo user + data
 
 ### Services (app/Services/)
+
 26. **`BridgeClient.php`** - Node.js API client (full HTTP implementation)
 
 ### Controllers (app/Http/Controllers/)
+
 27. **`WaSessionController.php`** - WhatsApp connect/disconnect/status (5 methods)
 28. **`ImportController.php`** - File upload/validation/parsing (5 methods + private parser)
 
 ### Console Commands (app/Console/Commands/)
+
 29. **`ExpireIdleSessions.php`** - Session cleanup
 
 ### Vue Pages (resources/js/pages/)
+
 30. **`WhatsApp/Connect.vue`** - QR display + polling + instructions
 31. **`Contacts/Imports/Index.vue`** - Upload + list imports
 32. **`Contacts/Imports/Show.vue`** - Import details + recipients table
@@ -65,7 +74,9 @@ Create these with timestamp prefix (YYYY_MM_DD_HHMMSS):
 ## 📝 Files to MODIFY
 
 ### 33. **`app/Models/User.php`**
+
 Add these relationship methods:
+
 ```php
 public function waSession(): HasOne
 public function waSessions(): HasMany
@@ -77,7 +88,9 @@ public function auditLogs(): HasMany
 ```
 
 ### 34. **`routes/web.php`**
+
 Add at the end:
+
 ```php
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\WaSessionController;
@@ -102,7 +115,9 @@ Route::middleware(['auth'])->prefix('contacts')->name('imports.')->group(functio
 ```
 
 ### 35. **`config/services.php`**
+
 Add bridge config:
+
 ```php
 'bridge' => [
     'url' => env('BRIDGE_BASE_URL', 'http://localhost:3000'),
@@ -111,13 +126,17 @@ Add bridge config:
 ```
 
 ### 36. **`app/Console/Kernel.php`**
+
 Add to `schedule()` method:
+
 ```php
 $schedule->command('wa:expire-sessions')->everyFiveMinutes();
 ```
 
 ### 37. **`app/Providers/AuthServiceProvider.php`**
+
 Add to `$policies` array:
+
 ```php
 use App\Models\{WaSession, Import, Recipient, Campaign, Message, AuditLog};
 use App\Policies\{WaSessionPolicy, ImportPolicy, RecipientPolicy, CampaignPolicy, MessagePolicy, AuditLogPolicy};
@@ -133,14 +152,18 @@ protected $policies = [
 ```
 
 ### 38. **`.env`**
+
 Add:
+
 ```env
 BRIDGE_BASE_URL=http://localhost:3000
 BRIDGE_TOKEN=your-secret-token-here
 ```
 
 ### 39. **`composer.json`**
+
 Add dependencies and run `composer install`:
+
 ```json
 "require": {
     "giggsey/libphonenumber-for-php": "^8.13",
@@ -171,6 +194,7 @@ php artisan db:seed --class=DemoSeeder
 ## 🎯 Features Implemented
 
 ### ✅ WhatsApp Connection
+
 - QR code generation via Node.js bridge
 - Real-time status polling (every 3 seconds)
 - Connected account display (name, phone, avatar)
@@ -179,6 +203,7 @@ php artisan db:seed --class=DemoSeeder
 - Session expiry (5 minutes for QR, 30 days for connected)
 
 ### ✅ Contact Management
+
 - CSV/Excel template download
 - File upload (max 10MB)
 - Phone validation & normalization (E.164 format)
@@ -188,12 +213,14 @@ php artisan db:seed --class=DemoSeeder
 - Import summary statistics
 
 ### ✅ Security & Access Control
+
 - All resources scoped to authenticated users
 - Policy-based authorization on all models
 - Audit logging for key actions
 - User-specific data isolation
 
 ### ✅ Database Structure
+
 - 6 tables with proper indexes
 - Foreign key constraints with cascade deletes
 - JSON columns for flexible data
@@ -255,10 +282,12 @@ audit_logs
 ## 🧪 Testing
 
 Demo login:
+
 - Email: `demo@example.com`
 - Password: `password`
 
 Includes:
+
 - Connected WhatsApp session
 - Import with 50 contacts (45 valid, 5 invalid)
 - Sample campaign with messages
@@ -304,6 +333,7 @@ Includes:
 ## 🎨 UI Components Used
 
 All pages use existing base components:
+
 - `Button`
 - `Input`
 - `Badge`

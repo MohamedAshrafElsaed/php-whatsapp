@@ -31,14 +31,14 @@ class CampaignFactory extends Factory
 
     public function draft(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'draft',
         ]);
     }
 
     public function running(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'running',
             'started_at' => now(),
         ]);

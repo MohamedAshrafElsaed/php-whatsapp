@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import { Form } from '@inertiajs/vue3';
 import { ref } from 'vue';
@@ -26,8 +26,8 @@ const passwordInput = ref<InstanceType<typeof Input> | null>(null);
 <template>
     <div class="space-y-6">
         <HeadingSmall
-            title="Delete account"
             description="Delete your account and all of its resources"
+            title="Delete account"
         />
         <div
             class="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10"
@@ -40,26 +40,25 @@ const passwordInput = ref<InstanceType<typeof Input> | null>(null);
             </div>
             <Dialog>
                 <DialogTrigger as-child>
-                    <Button variant="destructive" data-test="delete-user-button"
-                        >Delete account</Button
-                    >
+                    <Button data-test="delete-user-button" variant="destructive"
+                        >Delete account
+                    </Button>
                 </DialogTrigger>
                 <DialogContent>
                     <Form
-                        v-bind="ProfileController.destroy.form()"
-                        reset-on-success
-                        @error="() => passwordInput?.$el?.focus()"
+                        v-slot="{ errors, processing, reset, clearErrors }"
                         :options="{
                             preserveScroll: true,
                         }"
                         class="space-y-6"
-                        v-slot="{ errors, processing, reset, clearErrors }"
+                        reset-on-success
+                        v-bind="ProfileController.destroy.form()"
+                        @error="() => passwordInput?.$el?.focus()"
                     >
                         <DialogHeader class="space-y-3">
                             <DialogTitle
-                                >Are you sure you want to delete your
-                                account?</DialogTitle
-                            >
+                                >Are you sure you want to delete your account?
+                            </DialogTitle>
                             <DialogDescription>
                                 Once your account is deleted, all of its
                                 resources and data will also be permanently
@@ -70,15 +69,15 @@ const passwordInput = ref<InstanceType<typeof Input> | null>(null);
                         </DialogHeader>
 
                         <div class="grid gap-2">
-                            <Label for="password" class="sr-only"
+                            <Label class="sr-only" for="password"
                                 >Password</Label
                             >
                             <Input
                                 id="password"
-                                type="password"
-                                name="password"
                                 ref="passwordInput"
+                                name="password"
                                 placeholder="Password"
+                                type="password"
                             />
                             <InputError :message="errors.password" />
                         </div>
@@ -99,10 +98,10 @@ const passwordInput = ref<InstanceType<typeof Input> | null>(null);
                             </DialogClose>
 
                             <Button
-                                type="submit"
-                                variant="destructive"
                                 :disabled="processing"
                                 data-test="confirm-delete-user-button"
+                                type="submit"
+                                variant="destructive"
                             >
                                 Delete account
                             </Button>

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
 import InputError from '@/components/InputError.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -31,34 +31,34 @@ const currentPasswordInput = ref<HTMLInputElement | null>(null);
         <SettingsLayout>
             <div class="space-y-6">
                 <HeadingSmall
-                    title="Update password"
                     description="Ensure your account is using a long, random password to stay secure"
+                    title="Update password"
                 />
 
                 <Form
-                    v-bind="PasswordController.update.form()"
+                    v-slot="{ errors, processing, recentlySuccessful }"
                     :options="{
                         preserveScroll: true,
                     }"
-                    reset-on-success
                     :reset-on-error="[
                         'password',
                         'password_confirmation',
                         'current_password',
                     ]"
                     class="space-y-6"
-                    v-slot="{ errors, processing, recentlySuccessful }"
+                    reset-on-success
+                    v-bind="PasswordController.update.form()"
                 >
                     <div class="grid gap-2">
                         <Label for="current_password">Current password</Label>
                         <Input
                             id="current_password"
                             ref="currentPasswordInput"
-                            name="current_password"
-                            type="password"
-                            class="mt-1 block w-full"
                             autocomplete="current-password"
+                            class="mt-1 block w-full"
+                            name="current_password"
                             placeholder="Current password"
+                            type="password"
                         />
                         <InputError :message="errors.current_password" />
                     </div>
@@ -68,11 +68,11 @@ const currentPasswordInput = ref<HTMLInputElement | null>(null);
                         <Input
                             id="password"
                             ref="passwordInput"
-                            name="password"
-                            type="password"
-                            class="mt-1 block w-full"
                             autocomplete="new-password"
+                            class="mt-1 block w-full"
+                            name="password"
                             placeholder="New password"
+                            type="password"
                         />
                         <InputError :message="errors.password" />
                     </div>
@@ -83,11 +83,11 @@ const currentPasswordInput = ref<HTMLInputElement | null>(null);
                         >
                         <Input
                             id="password_confirmation"
-                            name="password_confirmation"
-                            type="password"
-                            class="mt-1 block w-full"
                             autocomplete="new-password"
+                            class="mt-1 block w-full"
+                            name="password_confirmation"
                             placeholder="Confirm password"
+                            type="password"
                         />
                         <InputError :message="errors.password_confirmation" />
                     </div>
@@ -96,8 +96,8 @@ const currentPasswordInput = ref<HTMLInputElement | null>(null);
                         <Button
                             :disabled="processing"
                             data-test="update-password-button"
-                            >Save password</Button
-                        >
+                            >Save password
+                        </Button>
 
                         <Transition
                             enter-active-class="transition ease-in-out"

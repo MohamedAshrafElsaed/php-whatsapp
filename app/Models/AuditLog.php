@@ -22,11 +22,6 @@ class AuditLog extends Model
         'meta_json' => 'array',
     ];
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
     public static function log(string $action, string $entity, $entityId = null, array $meta = []): void
     {
         static::create([
@@ -36,5 +31,10 @@ class AuditLog extends Model
             'entity_id' => $entityId,
             'meta_json' => $meta,
         ]);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

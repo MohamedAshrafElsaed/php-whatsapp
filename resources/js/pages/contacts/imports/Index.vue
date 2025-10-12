@@ -1,6 +1,6 @@
-<script setup lang="ts">
-import { Button } from '@/components/ui/button';
+<script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
@@ -82,10 +82,10 @@ const statusColor: Record<string, string> = {
 
             <!-- Actions -->
             <div class="flex gap-3">
-                <Button @click="downloadTemplate('csv')" variant="outline">
+                <Button variant="outline" @click="downloadTemplate('csv')">
                     Download CSV Template
                 </Button>
-                <Button @click="downloadTemplate('xlsx')" variant="outline">
+                <Button variant="outline" @click="downloadTemplate('xlsx')">
                     Download Excel Template
                 </Button>
             </div>
@@ -96,17 +96,21 @@ const statusColor: Record<string, string> = {
                 <div class="flex items-center gap-4">
                     <Input
                         ref="fileInput"
-                        type="file"
-                        accept=".csv,.xlsx"
-                        @change="handleFileChange"
                         :disabled="uploadForm.processing"
+                        accept=".csv,.xlsx"
+                        type="file"
+                        @change="handleFileChange"
                     />
-                    <span v-if="uploadForm.processing" class="text-sm text-muted-foreground">
+                    <span
+                        v-if="uploadForm.processing"
+                        class="text-sm text-muted-foreground"
+                    >
                         Uploading...
                     </span>
                 </div>
                 <p class="mt-2 text-sm text-muted-foreground">
-                    Accepted formats: CSV, Excel (.xlsx). Maximum file size: 10MB
+                    Accepted formats: CSV, Excel (.xlsx). Maximum file size:
+                    10MB
                 </p>
             </div>
 
@@ -115,53 +119,69 @@ const statusColor: Record<string, string> = {
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="border-b bg-muted/50">
-                        <tr>
-                            <th class="p-4 text-left font-medium">Filename</th>
-                            <th class="p-4 text-left font-medium">Total</th>
-                            <th class="p-4 text-left font-medium">Valid</th>
-                            <th class="p-4 text-left font-medium">Invalid</th>
-                            <th class="p-4 text-left font-medium">Status</th>
-                            <th class="p-4 text-left font-medium">Date</th>
-                            <th class="p-4 text-left font-medium">Actions</th>
-                        </tr>
+                            <tr>
+                                <th class="p-4 text-left font-medium">
+                                    Filename
+                                </th>
+                                <th class="p-4 text-left font-medium">Total</th>
+                                <th class="p-4 text-left font-medium">Valid</th>
+                                <th class="p-4 text-left font-medium">
+                                    Invalid
+                                </th>
+                                <th class="p-4 text-left font-medium">
+                                    Status
+                                </th>
+                                <th class="p-4 text-left font-medium">Date</th>
+                                <th class="p-4 text-left font-medium">
+                                    Actions
+                                </th>
+                            </tr>
                         </thead>
                         <tbody>
-                        <tr
-                            v-for="item in imports.data"
-                            :key="item.id"
-                            class="border-b hover:bg-muted/30"
-                        >
-                            <td class="p-4">{{ item.filename }}</td>
-                            <td class="p-4">{{ item.total_rows }}</td>
-                            <td class="p-4 text-green-600">{{ item.valid_rows }}</td>
-                            <td class="p-4 text-red-600">{{ item.invalid_rows }}</td>
-                            <td class="p-4">
-                                <Badge :variant="statusColor[item.status]">
-                                    {{ item.status }}
-                                </Badge>
-                            </td>
-                            <td class="p-4 text-sm text-muted-foreground">
-                                {{ new Date(item.created_at).toLocaleDateString() }}
-                            </td>
-                            <td class="p-4">
-                                <div class="flex gap-2">
-                                    <Button
-                                        @click="viewImport(item.id)"
-                                        size="sm"
-                                        variant="outline"
-                                    >
-                                        View
-                                    </Button>
-                                    <Button
-                                        @click="deleteImport(item.id)"
-                                        size="sm"
-                                        variant="destructive"
-                                    >
-                                        Delete
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
+                            <tr
+                                v-for="item in imports.data"
+                                :key="item.id"
+                                class="border-b hover:bg-muted/30"
+                            >
+                                <td class="p-4">{{ item.filename }}</td>
+                                <td class="p-4">{{ item.total_rows }}</td>
+                                <td class="p-4 text-green-600">
+                                    {{ item.valid_rows }}
+                                </td>
+                                <td class="p-4 text-red-600">
+                                    {{ item.invalid_rows }}
+                                </td>
+                                <td class="p-4">
+                                    <Badge :variant="statusColor[item.status]">
+                                        {{ item.status }}
+                                    </Badge>
+                                </td>
+                                <td class="p-4 text-sm text-muted-foreground">
+                                    {{
+                                        new Date(
+                                            item.created_at,
+                                        ).toLocaleDateString()
+                                    }}
+                                </td>
+                                <td class="p-4">
+                                    <div class="flex gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            @click="viewImport(item.id)"
+                                        >
+                                            View
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            @click="deleteImport(item.id)"
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

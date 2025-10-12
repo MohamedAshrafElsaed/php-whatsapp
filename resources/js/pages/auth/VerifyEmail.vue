@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import EmailVerificationNotificationController from '@/actions/App/Http/Controllers/Auth/EmailVerificationNotificationController';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,8 @@ defineProps<{
 
 <template>
     <AuthLayout
-        title="Verify email"
         description="Please verify your email address by clicking on the link we just emailed to you."
+        title="Verify email"
     >
         <Head title="Email verification" />
 
@@ -28,9 +28,9 @@ defineProps<{
         </div>
 
         <Form
-            v-bind="EmailVerificationNotificationController.store.form()"
-            class="space-y-6 text-center"
             v-slot="{ processing }"
+            class="space-y-6 text-center"
+            v-bind="EmailVerificationNotificationController.store.form()"
         >
             <Button :disabled="processing" variant="secondary">
                 <LoaderCircle v-if="processing" class="h-4 w-4 animate-spin" />

@@ -24,7 +24,7 @@ class WaSessionController extends Controller
     {
         $session = $request->user()->waSession;
 
-        return Inertia::render('WhatsApp/Connect', [
+        return Inertia::render('whatsapp/Connect', [
             'session' => $session,
         ]);
     }
