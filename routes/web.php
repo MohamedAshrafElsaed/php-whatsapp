@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\WaSessionController;
@@ -31,6 +32,18 @@ Route::middleware(['auth'])->prefix('contacts')->name('imports.')->group(functio
     Route::post('/imports', [ImportController::class, 'store'])->name('store');
     Route::get('/imports/{import}', [ImportController::class, 'show'])->name('show');
     Route::delete('/imports/{import}', [ImportController::class, 'destroy'])->name('destroy');
+});
+
+// Campaign Routes
+Route::middleware(['auth'])->prefix('campaigns')->name('campaigns.')->group(function () {
+    Route::get('/', [CampaignController::class, 'index'])->name('index');
+    Route::get('/create', [CampaignController::class, 'create'])->name('create');
+    Route::post('/', [CampaignController::class, 'store'])->name('store');
+    Route::get('/{campaign}', [CampaignController::class, 'show'])->name('show');
+    Route::post('/{campaign}/start', [CampaignController::class, 'start'])->name('start');
+    Route::post('/{campaign}/pause', [CampaignController::class, 'pause'])->name('pause');
+    Route::post('/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('cancel');
+    Route::delete('/{campaign}', [CampaignController::class, 'destroy'])->name('destroy');
 });
 
 require __DIR__ . '/settings.php';

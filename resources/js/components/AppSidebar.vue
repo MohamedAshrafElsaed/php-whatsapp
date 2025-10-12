@@ -14,7 +14,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, MessageSquare, Users } from 'lucide-vue-next';
+import { LayoutGrid, MessageSquare, Send, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -32,6 +32,11 @@ const mainNavItems: NavItem[] = [
         title: 'Contacts',
         href: '/contacts/imports',
         icon: Users,
+    },
+    {
+        title: 'Campaigns',
+        href: '/campaigns',
+        icon: Send,
     },
 ];
 

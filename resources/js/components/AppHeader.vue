@@ -28,6 +28,7 @@ import {
     Menu,
     MessageSquare,
     Users,
+    Send,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppearanceToggle from './AppearanceToggle.vue';
@@ -72,19 +73,24 @@ const mainNavItems: NavItem[] = [
         href: '/contacts/imports',
         icon: Users,
     },
+    {
+        title: 'Campaigns',
+        href: '/campaigns',
+        icon: Send,
+    },
 ];
 
 const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
+    // {
+    //     title: 'Repository',
+    //     href: 'https://github.com/laravel/vue-starter-kit',
+    //     icon: Folder,
+    // },
+    // {
+    //     title: 'Documentation',
+    //     href: 'https://laravel.com/docs/starter-kits#vue',
+    //     icon: BookOpen,
+    // },
 ];
 </script>
 
