@@ -35,7 +35,7 @@ return [
         ],
     ],
     'bridge' => [
-        'url' => env('WHATSAPP_BRIDGE_URL', 'http://localhost'),
+        'url' => env('WHATSAPP_BRIDGE_URL', 'https://api.whatsapp-sender.online'),
         'token' => env('WHATSAPP_BRIDGE_TOKEN'),
     ],
 ];
