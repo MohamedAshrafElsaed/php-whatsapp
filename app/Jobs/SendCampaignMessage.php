@@ -16,48 +16,38 @@ class SendCampaignMessage implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
-    public int $timeout = 60; // Increased timeout
+    public int $tries = 1; // Don't retry failed messages to avoid duplicate sends
+    public int $timeout = 30;
 
     /**
      * Create a new job instance.
      */
     public function __construct(
-        public int $messageId // Store ID instead of model
-    )
-    {
-    }
+        public Message $message
+    ) {}
 
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(BridgeClient $bridgeClient): void
     {
         try {
-            // Load message fresh from database
-            $message = Message::find($this->messageId);
-
-            if (!$message) {
-                Log::error('Message not found', ['message_id' => $this->messageId]);
-                return;
-            }
-
             // Check if campaign is still running
-            $campaign = $message->campaign;
+            $campaign = $this->message->campaign;
 
-            if (!$campaign || !$campaign->isRunning()) {
+            if (!$campaign->isRunning()) {
                 Log::info('Campaign not running, skipping message', [
-                    'campaign_id' => $campaign?->id,
-                    'message_id' => $message->id,
+                    'campaign_id' => $campaign->id,
+                    'message_id' => $this->message->id,
                 ]);
                 return;
             }
 
             // Get recipient
-            $recipient = $message->recipient;
+            $recipient = $this->message->recipient;
 
             if (!$recipient || !$recipient->is_valid) {
-                $this->markAsFailed($message, 'INVALID_RECIPIENT', 'Recipient is invalid or not found');
+                $this->markAsFailed('INVALID_RECIPIENT', 'Recipient is invalid or not found');
                 return;
             }
 
@@ -65,17 +55,7 @@ class SendCampaignMessage implements ShouldQueue
             $body = $this->renderMessageBody($campaign->message_template, $recipient);
 
             // Update message with rendered body
-            $message->update(['body_rendered' => $body]);
-
-            // Create BridgeClient instance here (fresh config)
-            $bridgeClient = app(BridgeClient::class);
-
-            Log::info('Attempting to send message', [
-                'campaign_id' => $campaign->id,
-                'message_id' => $message->id,
-                'phone' => $recipient->phone_e164,
-                'user_id' => $campaign->user_id,
-            ]);
+            $this->message->update(['body_rendered' => $body]);
 
             // Send message via WhatsApp bridge
             $response = $bridgeClient->sendMessage(
@@ -85,16 +65,15 @@ class SendCampaignMessage implements ShouldQueue
             );
 
             // Mark as sent
-            $message->update([
+            $this->message->update([
                 'status' => 'sent',
                 'sent_at' => now(),
             ]);
 
             Log::info('Message sent successfully', [
                 'campaign_id' => $campaign->id,
-                'message_id' => $message->id,
+                'message_id' => $this->message->id,
                 'phone' => $recipient->phone_e164,
-                'response' => $response,
             ]);
 
             // Check if campaign is finished
@@ -102,28 +81,13 @@ class SendCampaignMessage implements ShouldQueue
 
         } catch (\Exception $e) {
             Log::error('Failed to send message', [
-                'message_id' => $this->messageId,
+                'campaign_id' => $this->message->campaign_id,
+                'message_id' => $this->message->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
 
-            $message = Message::find($this->messageId);
-            if ($message) {
-                $this->markAsFailed($message, 'SEND_ERROR', $e->getMessage());
-            }
+            $this->markAsFailed('SEND_ERROR', $e->getMessage());
         }
-    }
-
-    /**
-     * Mark message as failed
-     */
-    private function markAsFailed(Message $message, string $errorCode, string $errorMessage): void
-    {
-        $message->update([
-            'status' => 'failed',
-            'error_code' => $errorCode,
-            'error_message' => substr($errorMessage, 0, 500),
-        ]);
     }
 
     /**
@@ -137,7 +101,6 @@ class SendCampaignMessage implements ShouldQueue
         $body = str_replace('{{first_name}}', $recipient->first_name ?? '', $body);
         $body = str_replace('{{last_name}}', $recipient->last_name ?? '', $body);
         $body = str_replace('{{email}}', $recipient->email ?? '', $body);
-        $body = str_replace('{{phone}}', $recipient->phone_raw ?? '', $body);
 
         // Replace extra_json fields
         if ($recipient->extra_json && is_array($recipient->extra_json)) {
@@ -150,6 +113,18 @@ class SendCampaignMessage implements ShouldQueue
         $body = preg_replace('/\{\{\w+\}\}/', '', $body);
 
         return trim($body);
+    }
+
+    /**
+     * Mark message as failed
+     */
+    private function markAsFailed(string $errorCode, string $errorMessage): void
+    {
+        $this->message->update([
+            'status' => 'failed',
+            'error_code' => $errorCode,
+            'error_message' => substr($errorMessage, 0, 500), // Limit error message length
+        ]);
     }
 
     /**
@@ -181,14 +156,10 @@ class SendCampaignMessage implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error('SendCampaignMessage job failed', [
-            'message_id' => $this->messageId,
+            'message_id' => $this->message->id,
             'error' => $exception->getMessage(),
-            'trace' => $exception->getTraceAsString(),
         ]);
 
-        $message = Message::find($this->messageId);
-        if ($message) {
-            $this->markAsFailed($message, 'JOB_FAILED', $exception->getMessage());
-        }
+        $this->markAsFailed('JOB_FAILED', $exception->getMessage());
     }
 }

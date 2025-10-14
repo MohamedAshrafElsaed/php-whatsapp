@@ -307,7 +307,7 @@ class CampaignController extends Controller
                 // Dispatch job with progressive delay to respect WhatsApp rate limits
                 // This prevents all jobs from hitting the API at once
                 $jobDelay = $index * $delaySeconds;
-                SendCampaignMessage::dispatch($message->id)->delay(now()->addSeconds($jobDelay));
+                SendCampaignMessage::dispatch($message)->delay(now()->addSeconds($jobDelay));
 
                 $messagesCreated++;
             }
