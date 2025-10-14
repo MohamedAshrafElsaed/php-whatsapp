@@ -35,7 +35,7 @@ return [
         ],
     ],
     'bridge' => [
-        'url' => env('BRIDGE_BASE_URL', 'http://localhost:3000'),
-        'token' => env('BRIDGE_TOKEN', 'your-secret-token'),
+        'url' => env('WHATSAPP_BRIDGE_URL', 'http://localhost'),
+        'token' => env('WHATSAPP_BRIDGE_TOKEN'),
     ],
 ];

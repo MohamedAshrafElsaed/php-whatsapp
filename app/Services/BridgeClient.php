@@ -17,17 +17,25 @@ class BridgeClient
     }
 
     /**
-     * Create or refresh WhatsApp session and get QR code
+     * Create or refresh WhatsApp session (queues connection request)
      */
-    public function createSession(int $userId): array
+    public function createSession(int $userId, ?array $credentials = null): array
     {
         try {
+            $payload = [
+                'user_id' => $userId,
+            ];
+
+            // Include credentials if provided (for database-backed auth)
+            if ($credentials !== null) {
+                $payload['credentials'] = $credentials;
+            }
+
             $response = Http::withHeaders([
                 'X-BRIDGE-TOKEN' => $this->token,
                 'Accept' => 'application/json',
-            ])->post("{$this->baseUrl}/api/sessions", [
-                'user_id' => $userId,
-            ]);
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/session/connect", $payload);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to create session: ' . $response->body());
@@ -44,6 +52,36 @@ class BridgeClient
     }
 
     /**
+     * Create session with pairing code
+     */
+    public function createSessionWithPairing(int $userId, string $phone): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-BRIDGE-TOKEN' => $this->token,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/session/connect", [
+                'user_id' => $userId,
+                'pairing_phone' => $phone,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to create pairing session: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient createSessionWithPairing error', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+                'phone' => $phone,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
      * Get current session status
      */
     public function getStatus(int $userId): array
@@ -52,7 +90,7 @@ class BridgeClient
             $response = Http::withHeaders([
                 'X-BRIDGE-TOKEN' => $this->token,
                 'Accept' => 'application/json',
-            ])->get("{$this->baseUrl}/api/sessions/{$userId}/status");
+            ])->get("{$this->baseUrl}/session/status/{$userId}");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get status: ' . $response->body());
@@ -69,23 +107,23 @@ class BridgeClient
     }
 
     /**
-     * Refresh QR code
+     * Get QR code for session
      */
-    public function refreshQr(int $userId): array
+    public function getQr(int $userId): array
     {
         try {
             $response = Http::withHeaders([
                 'X-BRIDGE-TOKEN' => $this->token,
                 'Accept' => 'application/json',
-            ])->post("{$this->baseUrl}/api/sessions/{$userId}/refresh");
+            ])->get("{$this->baseUrl}/session/qr/{$userId}");
 
             if ($response->failed()) {
-                throw new \Exception('Failed to refresh QR: ' . $response->body());
+                throw new \Exception('Failed to get QR: ' . $response->body());
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('BridgeClient refreshQr error', [
+            Log::error('BridgeClient getQr error', [
                 'error' => $e->getMessage(),
                 'user_id' => $userId,
             ]);
@@ -102,7 +140,10 @@ class BridgeClient
             $response = Http::withHeaders([
                 'X-BRIDGE-TOKEN' => $this->token,
                 'Accept' => 'application/json',
-            ])->delete("{$this->baseUrl}/api/sessions/{$userId}");
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/session/disconnect", [
+                'user_id' => $userId,
+            ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to disconnect: ' . $response->body());
@@ -119,7 +160,7 @@ class BridgeClient
     }
 
     /**
-     * Send bulk messages
+     * Send message via WhatsApp
      */
     public function sendMessage(int $userId, string $phone, string $message): array
     {
@@ -127,10 +168,12 @@ class BridgeClient
             $response = Http::withHeaders([
                 'X-BRIDGE-TOKEN' => $this->token,
                 'Accept' => 'application/json',
-            ])->post("{$this->baseUrl}/api/messages/send", [
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/session/send", [
                 'user_id' => $userId,
                 'phone' => $phone,
                 'message' => $message,
+                'default_country' => 'EG',
             ]);
 
             if ($response->failed()) {
@@ -143,6 +186,35 @@ class BridgeClient
                 'error' => $e->getMessage(),
                 'user_id' => $userId,
                 'phone' => $phone,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Refresh QR code (creates new session with force_new flag)
+     */
+    public function refreshQr(int $userId): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-BRIDGE-TOKEN' => $this->token,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/session/connect", [
+                'user_id' => $userId,
+                'force_new' => true
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to refresh QR: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient refreshQr error', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
             ]);
             throw $e;
         }

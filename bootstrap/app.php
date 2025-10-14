@@ -21,6 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'wa/session/credentials/store',
+            'wa/session/credentials/load',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -14,7 +14,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, MessageSquare, Send, Users } from 'lucide-vue-next';
+import { LayoutGrid, MessageSquare, Send, Users, Upload, MessageSquareText } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -29,9 +29,14 @@ const mainNavItems: NavItem[] = [
         icon: MessageSquare,
     },
     {
-        title: 'Contacts',
-        href: '/contacts/imports',
+        title: 'All Contacts',
+        href: '/contacts',
         icon: Users,
+    },
+    {
+        title: 'Import Contacts',
+        href: '/contacts/imports',
+        icon: Upload,
     },
     {
         title: 'Campaigns',
@@ -41,16 +46,11 @@ const mainNavItems: NavItem[] = [
 ];
 
 const footerNavItems: NavItem[] = [
-    // {
-    //     title: 'Github Repo',
-    //     href: 'https://github.com/laravel/vue-starter-kit',
-    //     icon: Folder,
-    // },
-    // {
-    //     title: 'Documentation',
-    //     href: 'https://laravel.com/docs/starter-kits#vue',
-    //     icon: BookOpen,
-    // },
+    {
+        title: 'Feature Requests',
+        href: '/feature-requests',
+        icon: MessageSquareText,
+    },
 ];
 </script>
 

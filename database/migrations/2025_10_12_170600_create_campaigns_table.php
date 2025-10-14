@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('campaigns', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('import_id')->constrained()->onDelete('cascade');
+            $table->foreignId('import_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('name');
             $table->text('message_template');
             $table->json('variables_json')->nullable();

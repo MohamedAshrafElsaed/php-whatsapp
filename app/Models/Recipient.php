@@ -49,4 +49,22 @@ class Recipient extends Model
     {
         return trim("{$this->first_name} {$this->last_name}");
     }
+
+    /**
+     * Scope for searching contacts by name, phone, or email
+     */
+    public function scopeSearch($query, ?string $search)
+    {
+        if (!$search) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($search) {
+            $q->where('first_name', 'like', "%{$search}%")
+                ->orWhere('last_name', 'like', "%{$search}%")
+                ->orWhere('phone_e164', 'like', "%{$search}%")
+                ->orWhere('phone_raw', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%");
+        });
+    }
 }

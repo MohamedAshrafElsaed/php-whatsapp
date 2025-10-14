@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('recipients', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('import_id')->constrained()->onDelete('cascade');
+            $table->foreignId('import_id')->nullable()->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('phone_raw');
             $table->string('phone_e164')->nullable();

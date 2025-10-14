@@ -21,15 +21,7 @@ import { dashboard } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 import type { InertiaLinkProps } from '@inertiajs/vue3';
 import { Link, usePage } from '@inertiajs/vue3';
-import {
-    BookOpen,
-    Folder,
-    LayoutGrid,
-    Menu,
-    MessageSquare,
-    Users,
-    Send,
-} from 'lucide-vue-next';
+import { LayoutGrid, MessageSquare, Users, Upload, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppearanceToggle from './AppearanceToggle.vue';
 import UserMenu from './UserMenu.vue';
@@ -69,9 +61,14 @@ const mainNavItems: NavItem[] = [
         icon: MessageSquare,
     },
     {
-        title: 'Contacts',
-        href: '/contacts/imports',
+        title: 'All Contacts',
+        href: '/contacts',
         icon: Users,
+    },
+    {
+        title: 'Import Contacts',
+        href: '/contacts/imports',
+        icon: Upload,
     },
     {
         title: 'Campaigns',

@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Session {
     id: number;
@@ -14,6 +16,9 @@ interface Session {
         phone?: string;
         name?: string;
         avatar?: string;
+        pairing_code?: string;
+        pairing_phone?: string;
+        method?: 'qr' | 'pairing';
     };
     last_seen_at: string;
     expires_at: string;
@@ -25,6 +30,9 @@ const props = defineProps<{
 
 const currentSession = ref(props.session);
 const polling = ref<number | null>(null);
+const isLoading = ref(false);
+const connectionMethod = ref<'qr' | 'pairing'>('qr');
+const pairingPhone = ref('');
 
 const statusColor = {
     pending: 'warning',
@@ -34,25 +42,93 @@ const statusColor = {
 };
 
 const connectWhatsApp = () => {
-    router.post('/wa/session');
+    if (connectionMethod.value === 'pairing') {
+        connectWithPairing();
+    } else {
+        connectWithQr();
+    }
+};
+
+const connectWithQr = () => {
+    isLoading.value = true;
+    router.post(
+        '/wa/session',
+        {},
+        {
+            onFinish: () => {
+                isLoading.value = false;
+            },
+            onSuccess: () => {
+                startPolling();
+            },
+        },
+    );
+};
+
+const connectWithPairing = () => {
+    if (!pairingPhone.value || pairingPhone.value.length < 10) {
+        alert('Please enter a valid phone number');
+        return;
+    }
+
+    isLoading.value = true;
+    router.post(
+        '/wa/session/pairing',
+        {
+            phone: pairingPhone.value,
+        },
+        {
+            onFinish: () => {
+                isLoading.value = false;
+            },
+            onSuccess: () => {
+                startPolling();
+            },
+        },
+    );
 };
 
 const refreshQr = () => {
-    router.post('/wa/session/refresh');
+    isLoading.value = true;
+    router.post(
+        '/wa/session/refresh',
+        {},
+        {
+            onFinish: () => {
+                isLoading.value = false;
+            },
+            onSuccess: () => {
+                startPolling();
+            },
+        },
+    );
 };
 
 const disconnect = () => {
     if (confirm('Are you sure you want to disconnect WhatsApp?')) {
-        router.delete('/wa/session');
+        isLoading.value = true;
+        router.delete('/wa/session', {
+            onFinish: () => {
+                isLoading.value = false;
+            },
+        });
     }
 };
 
 const pollStatus = async () => {
     try {
         const response = await axios.get('/wa/session/status');
-        currentSession.value = response.data.session;
+        const newSession = response.data.session;
 
-        if (response.data.session?.status === 'connected') {
+        // Update session
+        currentSession.value = newSession;
+
+        // Stop polling if connected or disconnected
+        if (
+            !newSession ||
+            newSession.status === 'connected' ||
+            newSession.status === 'disconnected'
+        ) {
             stopPolling();
         }
     } catch (error) {
@@ -61,6 +137,9 @@ const pollStatus = async () => {
 };
 
 const startPolling = () => {
+    stopPolling(); // Clear any existing interval
+
+    // Only poll if session exists and is pending
     if (currentSession.value?.status === 'pending') {
         polling.value = window.setInterval(pollStatus, 3000);
     }
@@ -73,7 +152,23 @@ const stopPolling = () => {
     }
 };
 
+// Watch for session prop changes from Inertia page visits
+watch(
+    () => props.session,
+    (newSession) => {
+        currentSession.value = newSession;
+
+        // Start polling only if status is pending
+        if (newSession?.status === 'pending') {
+            startPolling();
+        } else {
+            stopPolling();
+        }
+    },
+);
+
 onMounted(() => {
+    // Start polling only if current session is pending
     if (currentSession.value?.status === 'pending') {
         startPolling();
     }
@@ -83,7 +178,6 @@ onUnmounted(() => {
     stopPolling();
 });
 </script>
-
 <template>
     <AppLayout>
         <Head title="WhatsApp Connection" />
@@ -143,25 +237,83 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Instructions -->
+            <!-- Connection Method Selection -->
             <div
                 v-if="!currentSession || currentSession.status !== 'connected'"
                 class="space-y-4"
             >
-                <div class="rounded-lg bg-muted p-6">
-                    <h3 class="mb-3 font-semibold">How to Connect:</h3>
+                <!-- Method Selector -->
+                <div class="rounded-lg border p-6">
+                    <h3 class="mb-4 font-semibold">Choose Connection Method:</h3>
+                    <div class="flex gap-3">
+                        <Button
+                            :variant="connectionMethod === 'qr' ? 'default' : 'outline'"
+                            @click="connectionMethod = 'qr'"
+                        >
+                            QR Code
+                        </Button>
+                        <Button
+                            :variant="connectionMethod === 'pairing' ? 'default' : 'outline'"
+                            @click="connectionMethod = 'pairing'"
+                        >
+                            Pairing Code
+                        </Button>
+                    </div>
+                </div>
+
+                <!-- QR Code Method Instructions -->
+                <div
+                    v-if="connectionMethod === 'qr'"
+                    class="rounded-lg bg-muted p-6"
+                >
+                    <h3 class="mb-3 font-semibold">How to Connect with QR Code:</h3>
                     <ol class="list-decimal space-y-2 pl-5">
+                        <li>Click "Generate QR Code" button below</li>
                         <li>Open WhatsApp on your phone</li>
                         <li>Tap Menu or Settings → Linked Devices</li>
                         <li>Tap "Link a Device"</li>
-                        <li>Scan the QR code below with your phone</li>
+                        <li>Scan the QR code that appears below</li>
                     </ol>
                 </div>
 
-                <!-- QR Code -->
+                <!-- Pairing Code Method Instructions -->
+                <div
+                    v-if="connectionMethod === 'pairing'"
+                    class="space-y-4 rounded-lg bg-muted p-6"
+                >
+                    <h3 class="font-semibold">How to Connect with Pairing Code:</h3>
+                    <ol class="list-decimal space-y-2 pl-5">
+                        <li>Enter your phone number below</li>
+                        <li>Click "Generate Pairing Code" button</li>
+                        <li>Open WhatsApp on your phone</li>
+                        <li>Tap Menu or Settings → Linked Devices</li>
+                        <li>Tap "Link a Device"</li>
+                        <li>Tap "Link with phone number instead"</li>
+                        <li>Enter the 8-digit code shown below</li>
+                    </ol>
+
+                    <div class="space-y-2">
+                        <Label for="pairing-phone">
+                            Phone Number (with country code)
+                        </Label>
+                        <Input
+                            id="pairing-phone"
+                            v-model="pairingPhone"
+                            type="tel"
+                            placeholder="+201234567890"
+                            :disabled="isLoading"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Include country code (e.g., +20 for Egypt)
+                        </p>
+                    </div>
+                </div>
+
+                <!-- QR Code Display -->
                 <div
                     v-if="
                         currentSession?.status === 'pending' &&
+                        currentSession?.meta_json?.method === 'qr' &&
                         currentSession?.meta_json?.qr_base64
                     "
                     class="flex flex-col items-center space-y-4 rounded-lg border p-6"
@@ -177,6 +329,29 @@ onUnmounted(() => {
                     </p>
                 </div>
 
+                <!-- Pairing Code Display -->
+                <div
+                    v-if="
+                        currentSession?.status === 'pending' &&
+                        currentSession?.meta_json?.method === 'pairing' &&
+                        currentSession?.meta_json?.pairing_code
+                    "
+                    class="flex flex-col items-center space-y-4 rounded-lg border bg-primary/5 p-6"
+                >
+                    <h3 class="font-semibold">Your Pairing Code</h3>
+                    <div
+                        class="rounded-lg bg-background px-8 py-6 text-center font-mono text-4xl font-bold tracking-widest"
+                    >
+                        {{ currentSession.meta_json.pairing_code }}
+                    </div>
+                    <p class="text-sm text-muted-foreground">
+                        Enter this code on your phone: {{ currentSession.meta_json.pairing_phone }}
+                    </p>
+                    <p class="text-sm text-muted-foreground">
+                        Code expires in 5 minutes
+                    </p>
+                </div>
+
                 <!-- Connect Button -->
                 <div class="flex justify-center">
                     <Button
@@ -184,10 +359,24 @@ onUnmounted(() => {
                             !currentSession ||
                             currentSession.status === 'disconnected'
                         "
+                        :disabled="isLoading"
                         size="lg"
                         @click="connectWhatsApp"
                     >
-                        Generate QR Code
+                        <span v-if="isLoading">
+                            {{
+                                connectionMethod === 'qr'
+                                    ? 'Generating QR Code...'
+                                    : 'Generating Pairing Code...'
+                            }}
+                        </span>
+                        <span v-else>
+                            {{
+                                connectionMethod === 'qr'
+                                    ? 'Generate QR Code'
+                                    : 'Generate Pairing Code'
+                            }}
+                        </span>
                     </Button>
                 </div>
             </div>
@@ -195,19 +384,26 @@ onUnmounted(() => {
             <!-- Actions -->
             <div class="flex gap-3">
                 <Button
-                    v-if="currentSession?.status === 'expired'"
+                    v-if="
+                        currentSession?.status === 'expired' &&
+                        currentSession?.meta_json?.method === 'qr'
+                    "
+                    :disabled="isLoading"
                     variant="outline"
                     @click="refreshQr"
                 >
-                    Refresh QR Code
+                    <span v-if="isLoading">Refreshing...</span>
+                    <span v-else>Refresh QR Code</span>
                 </Button>
 
                 <Button
                     v-if="currentSession?.status === 'connected'"
+                    :disabled="isLoading"
                     variant="destructive"
                     @click="disconnect"
                 >
-                    Disconnect
+                    <span v-if="isLoading">Disconnecting...</span>
+                    <span v-else>Disconnect</span>
                 </Button>
             </div>
         </div>
