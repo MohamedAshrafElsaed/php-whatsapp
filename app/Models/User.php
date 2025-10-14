@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,7 +13,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
@@ -24,6 +25,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'country_code',
+        'phone',
+        'phone_verified',
     ];
 
     /**
@@ -92,6 +96,33 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class);
     }
 
+    public function otps(): HasMany
+    {
+        return $this->hasMany(Otp::class, 'phone', 'phone')
+            ->where('country_code', $this->country_code);
+    }
+
+    public function devices(): HasMany
+    {
+        return $this->hasMany(UserDevice::class);
+    }
+
+    /**
+     * Get the full phone number with country code
+     */
+    public function getFullPhoneAttribute(): string
+    {
+        return $this->country_code . $this->phone;
+    }
+
+    /**
+     * Check if user has a connected WhatsApp session
+     */
+    public function hasConnectedWhatsApp(): bool
+    {
+        return $this->waSession && $this->waSession->isConnected();
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -101,6 +132,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified' => 'boolean',
             'password' => 'hashed',
         ];
     }
