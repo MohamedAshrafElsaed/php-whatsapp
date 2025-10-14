@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.4",
+        "php": "^8.3",
         "giggsey/libphonenumber-for-php": "^9.0",
         "inertiajs/inertia-laravel": "^2.0",
         "jenssegers/agent": "^2.6",
