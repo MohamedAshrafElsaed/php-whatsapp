@@ -88,7 +88,7 @@ class RegisteredUserController extends Controller
             'country_code' => $phoneData['country_code'],
             'phone' => $phoneData['phone'],
             'password' => Hash::make($request->password),
-            'phone_verified' => false,
+            'phone_verified' => true,
         ]);
 
         event(new Registered($user));
