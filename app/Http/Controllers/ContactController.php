@@ -6,16 +6,23 @@ use App\Models\AuditLog;
 use App\Models\Message;
 use App\Models\Recipient;
 use App\Services\BridgeClient;
+use App\Services\FacebookConversionsApiService;
+use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use libphonenumber\NumberParseException;
+use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
+use Log;
 
 class ContactController extends Controller
 {
-    public function __construct(private BridgeClient $bridge)
+    public function __construct(
+        private readonly BridgeClient                  $bridge,
+        private readonly FacebookConversionsApiService $facebookService
+    )
     {
     }
 
@@ -51,14 +58,6 @@ class ContactController extends Controller
     }
 
     /**
-     * Show contact creation form
-     */
-    public function create(): Response
-    {
-        return Inertia::render('contacts/Create');
-    }
-
-    /**
      * Store new contact
      */
     public function store(Request $request): RedirectResponse
@@ -80,7 +79,7 @@ class ContactController extends Controller
         try {
             $phoneNumber = $phoneUtil->parse($phoneRaw, null);
             if ($phoneUtil->isValidNumber($phoneNumber)) {
-                $phoneE164 = $phoneUtil->format($phoneNumber, \libphonenumber\PhoneNumberFormat::E164);
+                $phoneE164 = $phoneUtil->format($phoneNumber, PhoneNumberFormat::E164);
             } else {
                 $errors[] = 'Invalid phone number';
             }
@@ -128,6 +127,14 @@ class ContactController extends Controller
 
         return redirect()->route('contacts.show', $contact)
             ->with('success', 'Contact created successfully.');
+    }
+
+    /**
+     * Show contact creation form
+     */
+    public function create(): Response
+    {
+        return Inertia::render('contacts/Create');
     }
 
     /**
@@ -212,10 +219,39 @@ class ContactController extends Controller
                 'phone' => $recipient->phone_e164,
             ]);
 
+            // Track Contact event on Facebook (individual message sent)
+            try {
+                $userData = $this->facebookService->buildUserDataFromAuth();
+
+                $customData = [
+                    'content_name' => 'Individual Message Sent',
+                    'status' => 'completed',
+                ];
+
+                // Add recipient info if available
+                if ($recipient->first_name) {
+                    $customData['content_category'] = 'Direct Message';
+                }
+
+                $this->facebookService->trackContact($userData, $customData);
+
+                Log::info('Facebook Contact event tracked for individual message', [
+                    'user_id' => $request->user()->id,
+                    'message_id' => $message->id,
+                    'recipient_id' => $recipient->id,
+                ]);
+            } catch (Exception $e) {
+                Log::error('Failed to track Facebook Contact event', [
+                    'user_id' => $request->user()->id,
+                    'message_id' => $message->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return redirect()->route('contacts.show', $recipient)
                 ->with('success', 'Message sent successfully.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Mark as failed if exists
             if (isset($message)) {
                 $message->update([

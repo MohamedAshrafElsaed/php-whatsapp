@@ -10,9 +10,17 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { ref, computed } from 'vue';
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -30,6 +38,52 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 const page = usePage();
 const user = page.props.auth.user;
+
+const industries = [
+    'Accounting',
+    'Advertising',
+    'Agriculture',
+    'Automotive',
+    'Banking',
+    'Construction',
+    'Consulting',
+    'E-commerce',
+    'Education',
+    'Energy',
+    'Entertainment',
+    'Fashion',
+    'Financial Services',
+    'Food & Beverage',
+    'Healthcare',
+    'Hospitality',
+    'Information Technology',
+    'Insurance',
+    'Legal Services',
+    'Manufacturing',
+    'Marketing',
+    'Media',
+    'Non-Profit',
+    'Pharmaceutical',
+    'Real Estate',
+    'Retail',
+    'Software',
+    'Technology',
+    'Telecommunications',
+    'Transportation',
+    'Travel & Tourism',
+    'Other',
+];
+
+const industrySearch = ref('');
+const selectedIndustry = ref(user.industry || '');
+
+// Filter industries based on search
+const filteredIndustries = computed(() => {
+    if (!industrySearch.value) return industries;
+    return industries.filter(industry =>
+        industry.toLowerCase().includes(industrySearch.value.toLowerCase())
+    );
+});
 </script>
 
 <template>
@@ -39,7 +93,7 @@ const user = page.props.auth.user;
         <SettingsLayout>
             <div class="flex flex-col space-y-6">
                 <HeadingSmall
-                    description="Update your name and email address"
+                    description="Update your profile information"
                     title="Profile information"
                 />
 
@@ -49,21 +103,35 @@ const user = page.props.auth.user;
                     v-bind="ProfileController.update.form()"
                 >
                     <div class="grid gap-2">
-                        <Label for="name">Name</Label>
+                        <Label for="first_name">First Name</Label>
                         <Input
-                            id="name"
-                            :default-value="user.name"
-                            autocomplete="name"
+                            id="first_name"
+                            :default-value="user.first_name"
+                            autocomplete="given-name"
                             class="mt-1 block w-full"
-                            name="name"
-                            placeholder="Full name"
+                            name="first_name"
+                            placeholder="First name"
                             required
                         />
-                        <InputError :message="errors.name" class="mt-2" />
+                        <InputError :message="errors.first_name" class="mt-2" />
                     </div>
 
                     <div class="grid gap-2">
-                        <Label for="email">Email address</Label>
+                        <Label for="last_name">Last Name</Label>
+                        <Input
+                            id="last_name"
+                            :default-value="user.last_name"
+                            autocomplete="family-name"
+                            class="mt-1 block w-full"
+                            name="last_name"
+                            placeholder="Last name"
+                            required
+                        />
+                        <InputError :message="errors.last_name" class="mt-2" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="email">Email address (Optional)</Label>
                         <Input
                             id="email"
                             :default-value="user.email"
@@ -71,13 +139,12 @@ const user = page.props.auth.user;
                             class="mt-1 block w-full"
                             name="email"
                             placeholder="Email address"
-                            required
                             type="email"
                         />
                         <InputError :message="errors.email" class="mt-2" />
                     </div>
 
-                    <div v-if="mustVerifyEmail && !user.email_verified_at">
+                    <div v-if="mustVerifyEmail && user.email && !user.email_verified_at">
                         <p class="-mt-4 text-sm text-muted-foreground">
                             Your email address is unverified.
                             <Link
@@ -98,11 +165,53 @@ const user = page.props.auth.user;
                         </div>
                     </div>
 
+                    <div class="grid gap-2">
+                        <Label for="industry">Industry (Optional)</Label>
+                        <Select v-model="selectedIndustry" name="industry">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select your industry" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <div class="p-2">
+                                    <Input
+                                        v-model="industrySearch"
+                                        placeholder="Search industries..."
+                                        class="mb-2"
+                                        @click.stop
+                                    />
+                                </div>
+                                <SelectItem
+                                    v-for="industry in filteredIndustries"
+                                    :key="industry"
+                                    :value="industry"
+                                >
+                                    {{ industry }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="errors.industry" class="mt-2" />
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="phone">Phone Number</Label>
+                        <Input
+                            id="phone"
+                            :default-value="`${user.country_code} ${user.phone}`"
+                            class="mt-1 block w-full bg-muted"
+                            disabled
+                            readonly
+                            type="text"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            Phone number cannot be changed. Contact support if needed.
+                        </p>
+                    </div>
+
                     <div class="flex items-center gap-4">
                         <Button
                             :disabled="processing"
                             data-test="update-profile-button"
-                            >Save
+                        >Save
                         </Button>
 
                         <Transition

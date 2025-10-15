@@ -16,7 +16,7 @@ import AuthBase from '@/layouts/AuthLayout.vue';
 import { login } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
 const countryCodes = [
     { code: '+1', country: 'US/Canada', digits: '10' },
@@ -28,9 +28,46 @@ const countryCodes = [
     { code: '+962', country: 'Jordan', digits: '9' },
 ];
 
+const industries = [
+    'Accounting',
+    'Advertising',
+    'Agriculture',
+    'Automotive',
+    'Banking',
+    'Construction',
+    'Consulting',
+    'E-commerce',
+    'Education',
+    'Energy',
+    'Entertainment',
+    'Fashion',
+    'Financial Services',
+    'Food & Beverage',
+    'Healthcare',
+    'Hospitality',
+    'Information Technology',
+    'Insurance',
+    'Legal Services',
+    'Manufacturing',
+    'Marketing',
+    'Media',
+    'Non-Profit',
+    'Pharmaceutical',
+    'Real Estate',
+    'Retail',
+    'Software',
+    'Technology',
+    'Telecommunications',
+    'Transportation',
+    'Travel & Tourism',
+    'Other',
+];
+
 const selectedCountryCode = ref('+20');
 const phoneInput = ref('');
 const phoneError = ref('');
+const selectedIndustry = ref('');
+const industrySearch = ref('');
 
 // Prevent user from typing country code
 const handlePhoneInput = (event: Event) => {
@@ -57,6 +94,14 @@ const handlePhoneInput = (event: Event) => {
 watch(selectedCountryCode, () => {
     phoneError.value = '';
 });
+
+// Filter industries based on search
+const filteredIndustries = computed(() => {
+    if (!industrySearch.value) return industries;
+    return industries.filter(industry =>
+        industry.toLowerCase().includes(industrySearch.value.toLowerCase())
+    );
+});
 </script>
 
 <template>
@@ -74,18 +119,72 @@ watch(selectedCountryCode, () => {
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="name">Full Name</Label>
+                    <Label for="first_name">First Name</Label>
                     <Input
-                        id="name"
+                        id="first_name"
                         :tabindex="1"
-                        autocomplete="name"
+                        autocomplete="given-name"
                         autofocus
-                        name="name"
-                        placeholder="John Doe"
+                        name="first_name"
+                        placeholder="John"
                         required
                         type="text"
                     />
-                    <InputError :message="errors.name" />
+                    <InputError :message="errors.first_name" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="last_name">Last Name</Label>
+                    <Input
+                        id="last_name"
+                        :tabindex="2"
+                        autocomplete="family-name"
+                        name="last_name"
+                        placeholder="Doe"
+                        required
+                        type="text"
+                    />
+                    <InputError :message="errors.last_name" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="email">Email (Optional)</Label>
+                    <Input
+                        id="email"
+                        :tabindex="3"
+                        autocomplete="email"
+                        name="email"
+                        placeholder="john@example.com"
+                        type="email"
+                    />
+                    <InputError :message="errors.email" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="industry">Industry (Optional)</Label>
+                    <Select v-model="selectedIndustry" name="industry">
+                        <SelectTrigger :tabindex="4">
+                            <SelectValue placeholder="Select your industry" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <div class="p-2">
+                                <Input
+                                    v-model="industrySearch"
+                                    placeholder="Search industries..."
+                                    class="mb-2"
+                                    @click.stop
+                                />
+                            </div>
+                            <SelectItem
+                                v-for="industry in filteredIndustries"
+                                :key="industry"
+                                :value="industry"
+                            >
+                                {{ industry }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="errors.industry" />
                 </div>
 
                 <div class="grid gap-2">
@@ -108,7 +207,7 @@ watch(selectedCountryCode, () => {
                         <Input
                             id="phone"
                             v-model="phoneInput"
-                            :tabindex="2"
+                            :tabindex="5"
                             autocomplete="tel"
                             class="flex-1"
                             inputmode="numeric"
@@ -134,7 +233,7 @@ watch(selectedCountryCode, () => {
                     <Label for="password">Password</Label>
                     <Input
                         id="password"
-                        :tabindex="3"
+                        :tabindex="6"
                         autocomplete="new-password"
                         name="password"
                         placeholder="Password"
@@ -148,7 +247,7 @@ watch(selectedCountryCode, () => {
                     <Label for="password_confirmation">Confirm Password</Label>
                     <Input
                         id="password_confirmation"
-                        :tabindex="4"
+                        :tabindex="7"
                         autocomplete="new-password"
                         name="password_confirmation"
                         placeholder="Confirm password"
@@ -162,7 +261,7 @@ watch(selectedCountryCode, () => {
                     :disabled="processing || !!phoneError"
                     class="mt-2 w-full"
                     data-test="register-user-button"
-                    tabindex="5"
+                    tabindex="8"
                     type="submit"
                 >
                     <LoaderCircle
@@ -177,7 +276,7 @@ watch(selectedCountryCode, () => {
                 Already have an account?
                 <TextLink
                     :href="login()"
-                    :tabindex="6"
+                    :tabindex="9"
                     class="underline underline-offset-4"
                 >
                     Log in

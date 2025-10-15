@@ -14,16 +14,13 @@ import {
 } from '@/components/ui/select';
 import AuthBase from '@/layouts/AuthLayout.vue';
 import { register } from '@/routes';
-import { Form, Head, usePage } from '@inertiajs/vue3';
+import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps<{
     status?: string;
 }>();
-
-const page = usePage();
-const otpFailed = computed(() => page.props.otp_failed || false);
 
 const countryCodes = [
     { code: '+1', country: 'US/Canada', digits: '10' },
@@ -38,7 +35,6 @@ const countryCodes = [
 const selectedCountryCode = ref('+20');
 const phoneInput = ref('');
 const phoneError = ref('');
-const showPasswordField = ref(otpFailed.value);
 
 // Prevent user from typing country code
 const handlePhoneInput = (event: Event) => {
@@ -65,19 +61,11 @@ const handlePhoneInput = (event: Event) => {
 watch(selectedCountryCode, () => {
     phoneError.value = '';
 });
-
-watch(otpFailed, (newValue) => {
-    showPasswordField.value = newValue;
-});
-
-const togglePasswordField = () => {
-    showPasswordField.value = !showPasswordField.value;
-};
 </script>
 
 <template>
     <AuthBase
-        description="Enter your phone number below to log in"
+        description="Enter your phone number and password to log in"
         title="Log in to your account"
     >
         <Head title="Log in" />
@@ -87,14 +75,6 @@ const togglePasswordField = () => {
             class="mb-4 text-center text-sm font-medium text-green-600"
         >
             {{ status }}
-        </div>
-
-        <div
-            v-if="otpFailed"
-            class="mb-4 rounded-lg bg-yellow-50 p-3 text-center text-sm text-yellow-800"
-        >
-            Could not send verification code. Please login with your password
-            instead.
         </div>
 
         <Form
@@ -138,14 +118,11 @@ const togglePasswordField = () => {
                     <p v-if="phoneError" class="text-xs text-destructive">
                         {{ phoneError }}
                     </p>
-                    <p v-if="!showPasswordField" class="text-xs text-muted-foreground">
-                        ⚠️ We'll send a verification code to your WhatsApp
-                    </p>
                     <InputError :message="errors.country_code" />
                     <InputError :message="errors.phone" />
                 </div>
 
-                <div v-if="showPasswordField" class="grid gap-2">
+                <div class="grid gap-2">
                     <Label for="password">Password</Label>
                     <Input
                         id="password"
@@ -153,6 +130,7 @@ const togglePasswordField = () => {
                         autocomplete="current-password"
                         name="password"
                         placeholder="Password"
+                        required
                         type="password"
                     />
                     <InputError :message="errors.password" />
@@ -160,7 +138,7 @@ const togglePasswordField = () => {
 
                 <Button
                     :disabled="processing || !!phoneError"
-                    :tabindex="showPasswordField ? 3 : 2"
+                    :tabindex="3"
                     class="mt-4 w-full"
                     data-test="login-button"
                     type="submit"
@@ -169,23 +147,13 @@ const togglePasswordField = () => {
                         v-if="processing"
                         class="h-4 w-4 animate-spin"
                     />
-                    {{ showPasswordField ? 'Login with password' : 'Send verification code' }}
+                    Log in
                 </Button>
-
-                <div class="text-center">
-                    <button
-                        class="text-sm text-muted-foreground hover:text-foreground underline"
-                        type="button"
-                        @click="togglePasswordField"
-                    >
-                        {{ showPasswordField ? 'Use verification code instead' : 'Use password instead' }}
-                    </button>
-                </div>
             </div>
 
             <div class="text-center text-sm text-muted-foreground">
                 Don't have an account?
-                <TextLink :href="register()" :tabindex="showPasswordField ? 4 : 3">
+                <TextLink :href="register()" :tabindex="4">
                     Sign up
                 </TextLink>
             </div>

@@ -5,10 +5,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\Otp;
 use App\Models\User;
 use App\Models\UserDevice;
-use App\Services\BridgeClient;
+use App\Services\FacebookConversionsApiService;
 use App\Services\PhoneValidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,8 +21,8 @@ use Inertia\Response;
 class AuthenticatedSessionController extends Controller
 {
     public function __construct(
-        private readonly BridgeClient $bridgeClient,
-        private readonly PhoneValidator $phoneValidator
+        private readonly PhoneValidator $phoneValidator,
+        private readonly FacebookConversionsApiService $facebookService
     ) {}
 
     /**
@@ -44,7 +43,7 @@ class AuthenticatedSessionController extends Controller
         $request->validate([
             'country_code' => 'required|string|max:5',
             'phone' => 'required|string|max:20',
-            'password' => 'nullable|string', // Password is optional
+            'password' => 'required|string',
         ]);
 
         // Validate and normalize phone number
@@ -76,75 +75,63 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
-        // If password provided, use password authentication
-        if ($request->filled('password')) {
-            if (!Hash::check($request->password, $user->password)) {
-                throw ValidationException::withMessages([
-                    'password' => 'The provided password is incorrect.',
-                ]);
-            }
-
-            // Login with password
-            Auth::login($user);
-            UserDevice::recordDevice($user->id);
-
-            // Log login
-            AuditLog::create([
-                'user_id' => $user->id,
-                'action' => 'user_logged_in_password',
-                'entity' => 'User',
-                'entity_id' => $user->id,
-                'meta_json' => [
-                    'method' => 'password',
-                    'ip' => $request->ip(),
-                ],
+        // Check password
+        if (!Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => 'The provided password is incorrect.',
             ]);
-
-            $request->session()->regenerate();
-
-            Log::info('Password login successful', [
-                'user_id' => $user->id,
-            ]);
-
-            return redirect()->intended(route('dashboard', absolute: false));
         }
 
-        // Try OTP authentication
+        // Login with password
+        Auth::login($user);
+        UserDevice::recordDevice($user->id);
+
+        // Log login
+        AuditLog::create([
+            'user_id' => $user->id,
+            'action' => 'user_logged_in_password',
+            'entity' => 'User',
+            'entity_id' => $user->id,
+            'meta_json' => [
+                'method' => 'password',
+                'ip' => $request->ip(),
+            ],
+        ]);
+
+        // Track Lead event on Facebook (user logged in)
         try {
-            // Send OTP
-            $this->sendOtp(
-                $phoneData['country_code'],
-                $phoneData['phone'],
-                $phoneData['full_phone'],
-                'login'
-            );
+            $userData = [
+                'email' => $user->email,
+                'phone' => $user->full_phone,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'external_id' => (string) $user->id,
+            ];
 
-            // Store data in session for verification
-            $request->session()->put([
-                'otp_country_code' => $phoneData['country_code'],
-                'otp_phone' => $phoneData['phone'],
-                'otp_type' => 'login',
-                'otp_user_id' => $user->id,
-            ]);
+            $customData = [
+                'content_name' => 'User Login',
+                'status' => 'completed',
+            ];
 
-            Log::info('Login OTP requested', [
+            $this->facebookService->trackLead($userData, $customData);
+
+            Log::info('Facebook Lead event tracked for login', [
                 'user_id' => $user->id,
-                'country_code' => $phoneData['country_code'],
-                'phone' => $phoneData['phone'],
             ]);
-
-            return redirect()->route('otp.verify');
         } catch (\Exception $e) {
-            Log::error('Failed to send login OTP', [
-                'error' => $e->getMessage(),
+            Log::error('Failed to track Facebook Lead event', [
                 'user_id' => $user->id,
-                'country_code' => $phoneData['country_code'],
-                'phone' => $phoneData['phone'],
+                'error' => $e->getMessage(),
             ]);
-
-            // Redirect back with option to use password
-            return back()->with('otp_failed', true)->withInput($request->only('country_code', 'phone'));
         }
+
+        $request->session()->regenerate();
+
+        Log::info('Password login successful', [
+            'user_id' => $user->id,
+        ]);
+
+        return redirect()->intended(route('dashboard', absolute: false));
     }
 
     /**
@@ -184,35 +171,5 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
-    }
-
-    /**
-     * Send OTP via WhatsApp
-     */
-    private function sendOtp(string $countryCode, string $phone, string $fullPhone, string $type): void
-    {
-        // Generate OTP code
-        $otpCode = Otp::generateCode();
-
-        // Store OTP in database
-        Otp::create([
-            'country_code' => $countryCode,
-            'phone' => $phone,
-            'otp_code' => $otpCode,
-            'type' => $type,
-            'expires_at' => now()->addMinutes(5),
-        ]);
-
-        // Get admin user (ID 1)
-        $adminUserId = 1;
-
-        // Send OTP via WhatsApp using full E.164 format
-        $message = "Your verification code is: *{$otpCode}*\n\nThis code will expire in 5 minutes.\n\n_Do not share this code with anyone._";
-
-        $this->bridgeClient->sendMessage(
-            $adminUserId,
-            $fullPhone,
-            $message
-        );
     }
 }

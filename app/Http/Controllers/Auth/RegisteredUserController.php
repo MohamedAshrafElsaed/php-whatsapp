@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\Otp;
 use App\Models\User;
-use App\Services\BridgeClient;
+use App\Models\UserDevice;
+use App\Services\FacebookConversionsApiService;
 use App\Services\PhoneValidator;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -23,8 +23,8 @@ use Inertia\Response;
 class RegisteredUserController extends Controller
 {
     public function __construct(
-        private readonly BridgeClient $bridgeClient,
-        private readonly PhoneValidator $phoneValidator
+        private readonly PhoneValidator $phoneValidator,
+        private readonly FacebookConversionsApiService $facebookService
     ) {}
 
     /**
@@ -41,7 +41,10 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255|unique:users,email',
+            'industry' => 'nullable|string|max:255',
             'country_code' => 'required|string|max:5',
             'phone' => 'required|string|max:20',
             'password' => ['required', 'confirmed', Password::defaults()],
@@ -76,13 +79,16 @@ class RegisteredUserController extends Controller
             ]);
         }
 
-        // Create user with password
+        // Create user
         $user = User::create([
-            'name' => $request->name,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'email' => $request->email,
+            'industry' => $request->industry,
             'country_code' => $phoneData['country_code'],
             'phone' => $phoneData['phone'],
             'password' => Hash::make($request->password),
-            'phone_verified' => false, // Not verified yet
+            'phone_verified' => false,
         ]);
 
         event(new Registered($user));
@@ -96,79 +102,52 @@ class RegisteredUserController extends Controller
             'meta_json' => [
                 'country_code' => $phoneData['country_code'],
                 'phone' => $phoneData['phone'],
+                'email' => $request->email,
+                'industry' => $request->industry,
                 'ip' => $request->ip(),
             ],
         ]);
 
-        // Try to send OTP for verification
+        // Track CompleteRegistration event on Facebook
         try {
-            $this->sendOtp(
-                $phoneData['country_code'],
-                $phoneData['phone'],
-                $phoneData['full_phone'],
-                'register'
-            );
+            $userData = [
+                'email' => $user->email,
+                'phone' => $user->full_phone,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'external_id' => (string) $user->id,
+            ];
 
-            // Store data in session for verification
-            $request->session()->put([
-                'otp_country_code' => $phoneData['country_code'],
-                'otp_phone' => $phoneData['phone'],
-                'otp_type' => 'register',
-                'otp_user_id' => $user->id,
-            ]);
+            $customData = [
+                'content_name' => 'User Registration',
+                'status' => 'completed',
+            ];
 
-            Log::info('Registration successful, OTP sent', [
+            if ($user->industry) {
+                $customData['content_category'] = $user->industry;
+            }
+
+            $this->facebookService->trackRegistration($userData, $customData);
+
+            Log::info('Facebook CompleteRegistration event tracked', [
                 'user_id' => $user->id,
-                'country_code' => $phoneData['country_code'],
-                'phone' => $phoneData['phone'],
             ]);
-
-            return redirect()->route('otp.verify');
         } catch (\Exception $e) {
-            Log::error('Failed to send registration OTP', [
-                'error' => $e->getMessage(),
+            Log::error('Failed to track Facebook CompleteRegistration event', [
                 'user_id' => $user->id,
-                'country_code' => $phoneData['country_code'],
-                'phone' => $phoneData['phone'],
+                'error' => $e->getMessage(),
             ]);
-
-            // Login user without phone verification
-            Auth::login($user);
-            $request->session()->regenerate();
-
-            return redirect()->route('dashboard')->with('warning',
-                'Registration successful! However, we could not send verification code. Please verify your phone in settings.'
-            );
         }
-    }
 
-    /**
-     * Send OTP via WhatsApp
-     */
-    private function sendOtp(string $countryCode, string $phone, string $fullPhone, string $type): void
-    {
-        // Generate OTP code
-        $otpCode = Otp::generateCode();
+        // Login user directly
+        Auth::login($user);
+        UserDevice::recordDevice($user->id);
+        $request->session()->regenerate();
 
-        // Store OTP in database
-        Otp::create([
-            'country_code' => $countryCode,
-            'phone' => $phone,
-            'otp_code' => $otpCode,
-            'type' => $type,
-            'expires_at' => now()->addMinutes(5),
+        Log::info('User registered and logged in', [
+            'user_id' => $user->id,
         ]);
 
-        // Get admin user (ID 1)
-        $adminUserId = 1;
-
-        // Send OTP via WhatsApp using full E.164 format
-        $message = "Your verification code is: *{$otpCode}*\n\nThis code will expire in 5 minutes.\n\n_Do not share this code with anyone._";
-
-        $this->bridgeClient->sendMessage(
-            $adminUserId,
-            $fullPhone,
-            $message
-        );
+        return redirect()->route('dashboard');
     }
 }

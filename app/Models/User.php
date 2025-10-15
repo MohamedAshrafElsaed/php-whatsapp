@@ -22,8 +22,10 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'first_name',
+        'last_name',
         'email',
+        'industry',
         'password',
         'country_code',
         'phone',
@@ -105,6 +107,14 @@ class User extends Authenticatable
     public function devices(): HasMany
     {
         return $this->hasMany(UserDevice::class);
+    }
+
+    /**
+     * Get the user's full name
+     */
+    public function getNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->last_name}");
     }
 
     /**
