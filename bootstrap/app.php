@@ -25,8 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->validateCsrfTokens(except: [
-            'wa/session/credentials/store',
-            'wa/session/credentials/load',
+            'w/session/credentials/store',
+            'w/session/credentials/load',
         ]);
 
         $middleware->alias([

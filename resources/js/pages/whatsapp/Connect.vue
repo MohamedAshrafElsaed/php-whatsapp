@@ -52,7 +52,7 @@ const connectWhatsApp = () => {
 const connectWithQr = () => {
     isLoading.value = true;
     router.post(
-        '/wa/session',
+        '/w/session',
         {},
         {
             onFinish: () => {
@@ -73,7 +73,7 @@ const connectWithPairing = () => {
 
     isLoading.value = true;
     router.post(
-        '/wa/session/pairing',
+        '/w/session/pairing',
         {
             phone: pairingPhone.value,
         },
@@ -91,7 +91,7 @@ const connectWithPairing = () => {
 const refreshQr = () => {
     isLoading.value = true;
     router.post(
-        '/wa/session/refresh',
+        '/w/session/refresh',
         {},
         {
             onFinish: () => {
@@ -107,7 +107,7 @@ const refreshQr = () => {
 const disconnect = () => {
     if (confirm('Are you sure you want to disconnect WhatsApp?')) {
         isLoading.value = true;
-        router.delete('/wa/session', {
+        router.delete('/w/session', {
             onFinish: () => {
                 isLoading.value = false;
             },
@@ -117,7 +117,7 @@ const disconnect = () => {
 
 const pollStatus = async () => {
     try {
-        const response = await axios.get('/wa/session/status');
+        const response = await axios.get('/w/session/status');
         const newSession = response.data.session;
 
         // Update session

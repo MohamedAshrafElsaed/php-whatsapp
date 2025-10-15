@@ -13,7 +13,7 @@ class VerifyCsrfToken extends Middleware
      */
     protected $except = [
         // WhatsApp Bridge API endpoints (called by Node.js)
-        'wa/session/credentials/store',
-        'wa/session/credentials/load',
+        'w/session/credentials/store',
+        'w/session/credentials/load',
     ];
 }
