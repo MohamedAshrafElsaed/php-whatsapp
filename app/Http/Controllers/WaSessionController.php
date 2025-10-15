@@ -56,7 +56,18 @@ class WaSessionController extends Controller
                 $bridgeStatus = $this->bridge->getStatus($user->id);
 
                 $previousStatus = $session->status;
-                $newStatus = $bridgeStatus['status'] ?? $session->status;
+                $newStatus = $previousStatus;
+
+                // Map bridge response to session status
+                if (isset($bridgeStatus['ready']) && $bridgeStatus['ready'] === true) {
+                    $newStatus = 'connected';
+                } elseif (isset($bridgeStatus['qr_available']) && $bridgeStatus['qr_available'] === true) {
+                    $newStatus = 'pending';
+                } elseif (isset($bridgeStatus['pairing_code']) && $bridgeStatus['pairing_code']) {
+                    $newStatus = 'pending';
+                } elseif (!isset($bridgeStatus['exists']) || $bridgeStatus['exists'] === false) {
+                    $newStatus = 'disconnected';
+                }
 
                 // Update session if status changed
                 if ($previousStatus !== $newStatus) {
@@ -67,9 +78,13 @@ class WaSessionController extends Controller
                         $updateData['last_heartbeat_at'] = now();
 
                         // Store WhatsApp profile info if available
-                        if (isset($bridgeStatus['meta'])) {
+                        if (isset($bridgeStatus['owner'])) {
                             $meta = $session->meta_json ?? [];
-                            $meta['profile'] = $bridgeStatus['meta'];
+                            $meta['profile'] = [
+                                'number' => $bridgeStatus['owner']['number'] ?? null,
+                                'pushName' => $bridgeStatus['owner']['pushName'] ?? null,
+                                'jid' => $bridgeStatus['owner']['jid'] ?? null,
+                            ];
                             $updateData['meta_json'] = $meta;
                         }
 
@@ -93,6 +108,28 @@ class WaSessionController extends Controller
                                 'error' => $e->getMessage(),
                             ]);
                         }
+                    } elseif ($newStatus === 'pending' && isset($bridgeStatus['qr_available']) && $bridgeStatus['qr_available']) {
+                        // Fetch fresh QR code
+                        try {
+                            $qrResponse = $this->bridge->getQr($user->id);
+                            $meta = $session->meta_json ?? [];
+                            $meta['qr_base64'] = $qrResponse['qr_image'] ?? null;
+                            $meta['method'] = 'qr';
+                            $updateData['meta_json'] = $meta;
+                            $updateData['expires_at'] = now()->addMinutes(5);
+                        } catch (Exception $e) {
+                            Log::warning('Failed to fetch QR during status polling', [
+                                'error' => $e->getMessage(),
+                                'user_id' => $user->id,
+                            ]);
+                        }
+                    } elseif ($newStatus === 'pending' && isset($bridgeStatus['pairing_code'])) {
+                        // Update pairing code in meta
+                        $meta = $session->meta_json ?? [];
+                        $meta['pairing_code'] = $bridgeStatus['pairing_code'];
+                        $meta['method'] = 'pairing';
+                        $updateData['meta_json'] = $meta;
+                        $updateData['expires_at'] = now()->addMinutes(5);
                     }
 
                     $session->update($updateData);
@@ -197,8 +234,28 @@ class WaSessionController extends Controller
         try {
             $user = $request->user();
 
-            // Call bridge to refresh QR
-            $qrResponse = $this->bridge->getQr($user->id);
+            // Call bridge to refresh QR (force_new = true)
+            $response = $this->bridge->refreshQr($user->id);
+
+            // Wait for new QR code to be generated
+            $qrResponse = null;
+            $maxAttempts = 20;
+            $attempt = 0;
+
+            while ($attempt < $maxAttempts && !$qrResponse) {
+                usleep(500000);
+
+                try {
+                    $qrResponse = $this->bridge->getQr($user->id);
+                    break;
+                } catch (Exception $e) {
+                    $attempt++;
+
+                    if ($attempt >= $maxAttempts) {
+                        throw new Exception('QR code generation timeout. Please try again.');
+                    }
+                }
+            }
 
             $session = WaSession::where('user_id', $user->id)->first();
             if ($session) {
