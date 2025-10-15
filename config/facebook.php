@@ -41,7 +41,7 @@ return [
     | Remove or leave empty for production
     |
     */
-    'test_event_code' => env('FACEBOOK_TEST_EVENT_CODE', 'TEST3466'),
+    'test_event_code' => env('FACEBOOK_TEST_EVENT_CODE', null),
 
     /*
     |--------------------------------------------------------------------------
