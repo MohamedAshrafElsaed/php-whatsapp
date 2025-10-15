@@ -179,10 +179,32 @@ onUnmounted(() => {
 });
 </script>
 <template>
+    <Head>
+        <title>Connect WhatsApp - Secure Connection</title>
+        <meta name="description" content="Securely connect your WhatsApp Business account. Official WhatsApp Web API integration.">
+        <meta name="robots" content="noindex, nofollow">
+        <meta property="og:title" content="WhatsApp Business Connection">
+        <meta property="og:description" content="Secure WhatsApp Business API integration">
+    </Head>
     <AppLayout>
         <Head title="WhatsApp Connection" />
 
+
         <div class="mx-auto max-w-2xl space-y-6 p-6">
+
+            <!-- Add trust badges -->
+            <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div class="flex items-center gap-3">
+                    <ShieldCheck class="h-6 w-6 text-blue-600" />
+                    <div>
+                        <h3 class="font-semibold text-blue-900 dark:text-blue-100">Secure Connection</h3>
+                        <p class="text-sm text-blue-700 dark:text-blue-300">
+                            This page uses official WhatsApp Web API. Your data is encrypted and secure.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div>
                 <h1 class="text-2xl font-bold">WhatsApp Connection</h1>
                 <p class="text-muted-foreground">

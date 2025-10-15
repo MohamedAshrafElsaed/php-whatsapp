@@ -20,7 +20,7 @@ Route::get('dashboard', [DashboardController::class, 'index'])
     ->name('dashboard');
 
 // WhatsApp Connection Routes - Require phone verification
-Route::middleware(['auth', 'verified.phone'])->prefix('wa')->name('wa.')->group(function () {
+Route::middleware(['auth', 'verified.phone'])->prefix('w')->name('wa.')->group(function () {
     Route::get('/connect', [WaSessionController::class, 'index'])->name('connect');
     Route::post('/session', [WaSessionController::class, 'store'])->name('session.store');
     Route::post('/session/pairing', [WaSessionController::class, 'storePairing'])->name('session.pairing');
