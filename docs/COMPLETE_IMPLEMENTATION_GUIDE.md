@@ -74,7 +74,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'WhatsApp',
-        href: '/wa/connect',
+        href: '/w/connect',
         icon: MessageSquare,  // NEW
     },
     {

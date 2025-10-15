@@ -55,7 +55,7 @@ defineProps<{
                         Connect your WhatsApp to start sending messages.
                         <Link
                             class="underline hover:text-orange-700"
-                            href="/wa/connect"
+                            href="/w/connect"
                         >
                             Connect Now
                         </Link>
