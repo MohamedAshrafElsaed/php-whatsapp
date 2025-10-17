@@ -56,11 +56,6 @@ const mainNavItems: NavItem[] = [
         icon: LayoutGrid,
     },
     {
-        title: 'WhatsApp',
-        href: '/w/connect',
-        icon: MessageSquare,
-    },
-    {
         title: 'All Contacts',
         href: '/contacts',
         icon: Users,
@@ -74,6 +69,11 @@ const mainNavItems: NavItem[] = [
         title: 'Campaigns',
         href: '/campaigns',
         icon: Send,
+    },
+    {
+        title: 'Connect WhatsApp',
+        href: '/w/connect',
+        icon: MessageSquare,
     },
 ];
 
