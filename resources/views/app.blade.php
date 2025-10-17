@@ -2,6 +2,13 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
       dir="{{ app()->getLocale() == 'ar' ? 'rtl' : 'ltr' }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
 <head>
+
+    {{-- Prevent indexing of auth pages --}}
+    @if(request()->is('login') || request()->is('register') || request()->is('password/*'))
+        <meta name="robots" content="noindex, nofollow">
+    @endif
+
+
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">

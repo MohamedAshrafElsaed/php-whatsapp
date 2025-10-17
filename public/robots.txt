@@ -14,6 +14,19 @@ Disallow: /campaigns/
 Disallow: /storage/
 Disallow: /vendor/
 
+# Block authentication pages from indexing
+Disallow: /login
+Disallow: /register
+Disallow: /password/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /wa/
+Disallow: /contacts/
+Disallow: /campaigns/
+Disallow: /storage/
+Disallow: /vendor/
+
 # Allow public assets
 Allow: /css/
 Allow: /js/
