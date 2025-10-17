@@ -6,6 +6,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeatureRequestController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\WaSessionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -79,3 +80,6 @@ Route::middleware(['auth'])->prefix('feature-requests')->name('feature-requests.
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
+
+
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
