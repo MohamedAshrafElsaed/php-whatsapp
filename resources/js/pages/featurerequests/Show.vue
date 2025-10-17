@@ -46,35 +46,42 @@ const statusLabels: Record<string, string> = {
     <AppLayout>
         <Head :title="request.title" />
 
-        <div class="mx-auto max-w-4xl space-y-6 p-6">
+        <div class="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
             <!-- Header -->
-            <div class="flex items-center gap-4">
+            <div
+                class="flex flex-col items-start gap-4 sm:flex-row sm:items-center"
+            >
                 <Link href="/feature-requests">
                     <Button size="icon" variant="ghost">
                         <ArrowLeft class="h-5 w-5" />
                     </Button>
                 </Link>
-                <div class="flex-1">
-                    <h1 class="text-3xl font-bold tracking-tight">
+                <div class="min-w-0 flex-1">
+                    <h1
+                        class="text-2xl font-bold tracking-tight break-words md:text-3xl"
+                    >
                         {{ request.title }}
                     </h1>
                 </div>
-                <Badge :variant="statusColors[request.status]" class="text-sm">
+                <Badge
+                    :variant="statusColors[request.status]"
+                    class="shrink-0 text-sm"
+                >
                     {{ statusLabels[request.status] }}
                 </Badge>
             </div>
 
             <!-- Request Details -->
-            <div class="rounded-lg border bg-card p-6">
+            <div class="rounded-lg border bg-card p-4 md:p-6">
                 <div
-                    class="mb-6 flex items-center gap-6 text-sm text-muted-foreground"
+                    class="mb-6 flex flex-col items-start gap-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:gap-6"
                 >
                     <div class="flex items-center gap-2">
-                        <User class="h-4 w-4" />
-                        <span>{{ request.user.name }}</span>
+                        <User class="h-4 w-4 shrink-0" />
+                        <span class="break-words">{{ request.user.name }}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <Calendar class="h-4 w-4" />
+                        <Calendar class="h-4 w-4 shrink-0" />
                         <span
                             >Submitted
                             {{
@@ -88,9 +95,11 @@ const statusLabels: Record<string, string> = {
 
                 <div class="space-y-6">
                     <div>
-                        <h2 class="mb-3 text-lg font-semibold">Description</h2>
+                        <h2 class="mb-3 text-base font-semibold md:text-lg">
+                            Description
+                        </h2>
                         <div
-                            class="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground"
+                            class="text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground"
                         >
                             {{ request.description }}
                         </div>
@@ -101,27 +110,33 @@ const statusLabels: Record<string, string> = {
                         v-if="request.admin_notes"
                         class="rounded-lg border bg-muted/50 p-4"
                     >
-                        <h3 class="mb-2 font-semibold">Admin Response</h3>
+                        <h3 class="mb-2 text-sm font-semibold md:text-base">
+                            Admin Response
+                        </h3>
                         <p
-                            class="text-sm whitespace-pre-wrap text-muted-foreground"
+                            class="text-sm break-words whitespace-pre-wrap text-muted-foreground"
                         >
                             {{ request.admin_notes }}
                         </p>
                     </div>
 
-                    <!-- Status Timeline (placeholder for future enhancement) -->
+                    <!-- Status Timeline -->
                     <div class="border-t pt-4">
-                        <h3 class="mb-3 font-semibold">Timeline</h3>
+                        <h3 class="mb-3 text-sm font-semibold md:text-base">
+                            Timeline
+                        </h3>
                         <div class="space-y-2">
                             <div class="flex items-start gap-3">
                                 <div
-                                    class="mt-1 h-2 w-2 rounded-full bg-primary"
+                                    class="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary"
                                 ></div>
-                                <div class="flex-1">
+                                <div class="min-w-0 flex-1">
                                     <p class="text-sm font-medium">
                                         Request Submitted
                                     </p>
-                                    <p class="text-xs text-muted-foreground">
+                                    <p
+                                        class="text-xs break-words text-muted-foreground"
+                                    >
                                         {{
                                             new Date(
                                                 request.created_at,
@@ -135,14 +150,16 @@ const statusLabels: Record<string, string> = {
                                 class="flex items-start gap-3"
                             >
                                 <div
-                                    class="mt-1 h-2 w-2 rounded-full bg-primary"
+                                    class="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary"
                                 ></div>
-                                <div class="flex-1">
+                                <div class="min-w-0 flex-1">
                                     <p class="text-sm font-medium">
                                         Status:
                                         {{ statusLabels[request.status] }}
                                     </p>
-                                    <p class="text-xs text-muted-foreground">
+                                    <p
+                                        class="text-xs break-words text-muted-foreground"
+                                    >
                                         {{
                                             new Date(
                                                 request.updated_at,

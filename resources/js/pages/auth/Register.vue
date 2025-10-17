@@ -16,7 +16,7 @@ import AuthBase from '@/layouts/AuthLayout.vue';
 import { login } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
-import { ref, watch, computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const countryCodes = [
     { code: '+1', country: 'US/Canada', digits: '10' },
@@ -69,7 +69,6 @@ const phoneError = ref('');
 const selectedIndustry = ref('');
 const industrySearch = ref('');
 
-// Prevent user from typing country code
 const handlePhoneInput = (event: Event) => {
     const target = event.target as HTMLInputElement;
     let value = target.value;
@@ -95,11 +94,10 @@ watch(selectedCountryCode, () => {
     phoneError.value = '';
 });
 
-// Filter industries based on search
 const filteredIndustries = computed(() => {
     if (!industrySearch.value) return industries;
-    return industries.filter(industry =>
-        industry.toLowerCase().includes(industrySearch.value.toLowerCase())
+    return industries.filter((industry) =>
+        industry.toLowerCase().includes(industrySearch.value.toLowerCase()),
     );
 });
 </script>
@@ -170,8 +168,8 @@ const filteredIndustries = computed(() => {
                             <div class="p-2">
                                 <Input
                                     v-model="industrySearch"
-                                    placeholder="Search industries..."
                                     class="mb-2"
+                                    placeholder="Search industries..."
                                     @click.stop
                                 />
                             </div>
@@ -189,9 +187,12 @@ const filteredIndustries = computed(() => {
 
                 <div class="grid gap-2">
                     <Label for="phone">Phone Number</Label>
-                    <div class="flex gap-2">
-                        <Select v-model="selectedCountryCode" name="country_code">
-                            <SelectTrigger class="w-[140px]">
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Select
+                            v-model="selectedCountryCode"
+                            name="country_code"
+                        >
+                            <SelectTrigger class="w-full sm:w-[140px]">
                                 <SelectValue placeholder="Code" />
                             </SelectTrigger>
                             <SelectContent>
@@ -212,7 +213,7 @@ const filteredIndustries = computed(() => {
                             class="flex-1"
                             inputmode="numeric"
                             name="phone"
-                            placeholder="1097154916"
+                            placeholder="1099999999"
                             required
                             type="tel"
                             @input="handlePhoneInput"

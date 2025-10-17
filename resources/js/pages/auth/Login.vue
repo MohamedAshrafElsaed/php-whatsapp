@@ -36,7 +36,6 @@ const selectedCountryCode = ref('+20');
 const phoneInput = ref('');
 const phoneError = ref('');
 
-// Prevent user from typing country code
 const handlePhoneInput = (event: Event) => {
     const target = event.target as HTMLInputElement;
     let value = target.value;
@@ -85,9 +84,12 @@ watch(selectedCountryCode, () => {
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="phone">Phone Number</Label>
-                    <div class="flex gap-2">
-                        <Select v-model="selectedCountryCode" name="country_code">
-                            <SelectTrigger class="w-[140px]">
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Select
+                            v-model="selectedCountryCode"
+                            name="country_code"
+                        >
+                            <SelectTrigger class="w-full sm:w-[140px]">
                                 <SelectValue placeholder="Code" />
                             </SelectTrigger>
                             <SelectContent>
@@ -109,7 +111,7 @@ watch(selectedCountryCode, () => {
                             class="flex-1"
                             inputmode="numeric"
                             name="phone"
-                            placeholder="1097154916"
+                            placeholder="1099999999"
                             required
                             type="tel"
                             @input="handlePhoneInput"
@@ -153,9 +155,7 @@ watch(selectedCountryCode, () => {
 
             <div class="text-center text-sm text-muted-foreground">
                 Don't have an account?
-                <TextLink :href="register()" :tabindex="4">
-                    Sign up
-                </TextLink>
+                <TextLink :href="register()" :tabindex="4"> Sign up </TextLink>
             </div>
         </Form>
     </AuthBase>

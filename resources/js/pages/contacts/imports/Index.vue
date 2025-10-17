@@ -1,12 +1,18 @@
 <script lang="ts" setup>
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { AlertCircle, CheckCircle2, Upload, FileSpreadsheet, Download } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Download,
+    FileSpreadsheet,
+    Upload,
+} from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 
 interface Import {
     id: number;
@@ -81,20 +87,32 @@ const statusColor: Record<string, string> = {
     <AppLayout>
         <Head title="Contact Imports" />
 
-        <div class="space-y-6 p-6">
-            <div class="flex items-center justify-between">
+        <div class="space-y-6 p-4 md:p-6">
+            <div
+                class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between"
+            >
                 <div>
-                    <h1 class="text-2xl font-bold">Contact Imports</h1>
-                    <p class="text-muted-foreground">
+                    <h1 class="text-xl font-bold md:text-2xl">
+                        Contact Imports
+                    </h1>
+                    <p class="text-sm text-muted-foreground md:text-base">
                         Upload and manage your contact lists
                     </p>
                 </div>
             </div>
 
             <!-- Success Alert -->
-            <Alert v-if="flashSuccess" variant="default" class="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                <CheckCircle2 class="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertTitle class="text-green-800 dark:text-green-200">Success</AlertTitle>
+            <Alert
+                v-if="flashSuccess"
+                class="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                variant="default"
+            >
+                <CheckCircle2
+                    class="h-4 w-4 text-green-600 dark:text-green-400"
+                />
+                <AlertTitle class="text-green-800 dark:text-green-200"
+                    >Success</AlertTitle
+                >
                 <AlertDescription class="text-green-700 dark:text-green-300">
                     {{ flashSuccess }}
                 </AlertDescription>
@@ -119,47 +137,74 @@ const statusColor: Record<string, string> = {
             </Alert>
 
             <!-- Actions -->
-            <div class="flex gap-3">
-                <Button variant="outline" @click="downloadTemplate('csv')">
+            <div class="flex flex-col gap-3 sm:flex-row">
+                <Button
+                    class="w-full sm:w-auto"
+                    variant="outline"
+                    @click="downloadTemplate('csv')"
+                >
                     <Download class="mr-2 h-4 w-4" />
                     Download CSV Template
                 </Button>
-                <Button variant="outline" @click="downloadTemplate('xlsx')">
+                <Button
+                    class="w-full sm:w-auto"
+                    variant="outline"
+                    @click="downloadTemplate('xlsx')"
+                >
                     <Download class="mr-2 h-4 w-4" />
                     Download Excel Template
                 </Button>
             </div>
 
             <!-- Upload Form -->
-            <div class="rounded-lg border bg-card p-6">
+            <div class="rounded-lg border bg-card p-4 md:p-6">
                 <div class="mb-4 flex items-center gap-2">
-                    <Upload class="h-5 w-5 text-muted-foreground" />
-                    <h2 class="text-lg font-semibold">Upload Contacts</h2>
+                    <Upload class="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <h2 class="text-base font-semibold md:text-lg">
+                        Upload Contacts
+                    </h2>
                 </div>
                 <div class="space-y-4">
-                    <div class="flex items-center gap-4">
+                    <div
+                        class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center"
+                    >
                         <Input
                             ref="fileInput"
                             :disabled="uploadForm.processing"
                             accept=".csv,.xlsx"
-                            type="file"
                             class="flex-1"
+                            type="file"
                             @change="handleFileChange"
                         />
                         <span
                             v-if="uploadForm.processing"
-                            class="text-sm text-muted-foreground"
+                            class="text-center text-sm text-muted-foreground sm:text-left"
                         >
                             Processing...
                         </span>
                     </div>
-                    <div class="rounded-md bg-muted/50 p-4">
-                        <p class="mb-2 text-sm font-medium">File Requirements:</p>
-                        <ul class="space-y-1 text-sm text-muted-foreground">
+                    <div class="rounded-md bg-muted/50 p-3 md:p-4">
+                        <p class="mb-2 text-sm font-medium">
+                            File Requirements:
+                        </p>
+                        <ul
+                            class="space-y-1 text-xs text-muted-foreground md:text-sm"
+                        >
                             <li>• Accepted formats: CSV or Excel (.xlsx)</li>
                             <li>• Maximum file size: 10MB</li>
-                            <li>• Required column: <span class="font-mono font-semibold">phone</span> (with country code, e.g., +1234567890)</li>
-                            <li>• Optional columns: <span class="font-mono">first_name</span>, <span class="font-mono">last_name</span>, <span class="font-mono">email</span></li>
+                            <li>
+                                • Required column:
+                                <span class="font-mono font-semibold"
+                                    >phone</span
+                                >
+                                (with country code, e.g., +1234567890)
+                            </li>
+                            <li>
+                                • Optional columns:
+                                <span class="font-mono">first_name</span>,
+                                <span class="font-mono">last_name</span>,
+                                <span class="font-mono">email</span>
+                            </li>
                             <li>• First row must contain column headers</li>
                         </ul>
                     </div>
@@ -170,65 +215,113 @@ const statusColor: Record<string, string> = {
             <div class="rounded-lg border bg-card">
                 <div class="border-b bg-muted/50 p-4">
                     <div class="flex items-center gap-2">
-                        <FileSpreadsheet class="h-5 w-5 text-muted-foreground" />
-                        <h2 class="text-lg font-semibold">Import History</h2>
+                        <FileSpreadsheet
+                            class="h-5 w-5 shrink-0 text-muted-foreground"
+                        />
+                        <h2 class="text-base font-semibold md:text-lg">
+                            Import History
+                        </h2>
                     </div>
                 </div>
 
                 <div v-if="imports.data.length > 0" class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="w-full min-w-[700px]">
                         <thead class="border-b bg-muted/30">
-                        <tr>
-                            <th class="p-4 text-left font-medium">Filename</th>
-                            <th class="p-4 text-left font-medium">Total</th>
-                            <th class="p-4 text-left font-medium">Valid</th>
-                            <th class="p-4 text-left font-medium">Invalid</th>
-                            <th class="p-4 text-left font-medium">Status</th>
-                            <th class="p-4 text-left font-medium">Date</th>
-                            <th class="p-4 text-right font-medium">Actions</th>
-                        </tr>
+                            <tr>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Filename
+                                </th>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Total
+                                </th>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Valid
+                                </th>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Invalid
+                                </th>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Status
+                                </th>
+                                <th
+                                    class="p-3 text-left text-sm font-medium md:p-4"
+                                >
+                                    Date
+                                </th>
+                                <th
+                                    class="p-3 text-right text-sm font-medium md:p-4"
+                                >
+                                    Actions
+                                </th>
+                            </tr>
                         </thead>
                         <tbody class="divide-y">
-                        <tr
-                            v-for="item in imports.data"
-                            :key="item.id"
-                            class="hover:bg-muted/30"
-                        >
-                            <td class="p-4 font-medium">{{ item.filename }}</td>
-                            <td class="p-4">{{ item.total_rows }}</td>
-                            <td class="p-4 text-green-600 dark:text-green-400">
-                                {{ item.valid_rows }}
-                            </td>
-                            <td class="p-4 text-red-600 dark:text-red-400">
-                                {{ item.invalid_rows }}
-                            </td>
-                            <td class="p-4">
-                                <Badge :variant="statusColor[item.status]">
-                                    {{ item.status }}
-                                </Badge>
-                            </td>
-                            <td class="p-4 text-sm text-muted-foreground">
-                                {{ new Date(item.created_at).toLocaleDateString() }}
-                            </td>
-                            <td class="p-4">
-                                <div class="flex justify-end gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        @click="viewImport(item.id)"
-                                    >
-                                        View
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        @click="deleteImport(item.id)"
-                                    >
-                                        Delete
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
+                            <tr
+                                v-for="item in imports.data"
+                                :key="item.id"
+                                class="hover:bg-muted/30"
+                            >
+                                <td
+                                    class="max-w-[200px] p-3 text-sm font-medium break-words md:p-4"
+                                >
+                                    {{ item.filename }}
+                                </td>
+                                <td class="p-3 text-sm md:p-4">
+                                    {{ item.total_rows }}
+                                </td>
+                                <td
+                                    class="p-3 text-sm text-green-600 md:p-4 dark:text-green-400"
+                                >
+                                    {{ item.valid_rows }}
+                                </td>
+                                <td
+                                    class="p-3 text-sm text-red-600 md:p-4 dark:text-red-400"
+                                >
+                                    {{ item.invalid_rows }}
+                                </td>
+                                <td class="p-3 md:p-4">
+                                    <Badge :variant="statusColor[item.status]">
+                                        {{ item.status }}
+                                    </Badge>
+                                </td>
+                                <td
+                                    class="p-3 text-sm text-muted-foreground md:p-4"
+                                >
+                                    {{
+                                        new Date(
+                                            item.created_at,
+                                        ).toLocaleDateString()
+                                    }}
+                                </td>
+                                <td class="p-3 md:p-4">
+                                    <div class="flex justify-end gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            @click="viewImport(item.id)"
+                                        >
+                                            View
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            @click="deleteImport(item.id)"
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -236,10 +329,14 @@ const statusColor: Record<string, string> = {
                 <!-- Empty State -->
                 <div
                     v-else
-                    class="flex flex-col items-center justify-center p-12 text-center"
+                    class="flex flex-col items-center justify-center p-8 text-center md:p-12"
                 >
-                    <FileSpreadsheet class="mb-4 h-12 w-12 text-muted-foreground" />
-                    <p class="text-lg font-medium">No imports yet</p>
+                    <FileSpreadsheet
+                        class="mb-4 h-12 w-12 text-muted-foreground"
+                    />
+                    <p class="text-base font-medium md:text-lg">
+                        No imports yet
+                    </p>
                     <p class="text-sm text-muted-foreground">
                         Upload a contact file to get started
                     </p>

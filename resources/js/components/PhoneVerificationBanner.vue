@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -7,7 +8,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import InputError from '@/components/InputError.vue';
 import {
     PinInput,
     PinInputGroup,
@@ -78,11 +78,15 @@ const submitOtp = () => {
 };
 
 // Watch for flash messages
-watch(() => page.props.flash, (flash: any) => {
-    if (flash?.status) {
-        console.log('Flash message:', flash.status);
-    }
-}, { deep: true });
+watch(
+    () => page.props.flash,
+    (flash: any) => {
+        if (flash?.status) {
+            console.log('Flash message:', flash.status);
+        }
+    },
+    { deep: true },
+);
 </script>
 
 <template>
@@ -91,7 +95,7 @@ watch(() => page.props.flash, (flash: any) => {
             <CardHeader>
                 <div class="flex items-start justify-between">
                     <div class="flex items-start gap-3">
-                        <AlertCircle class="h-5 w-5 text-yellow-600 mt-0.5" />
+                        <AlertCircle class="mt-0.5 h-5 w-5 text-yellow-600" />
                         <div>
                             <CardTitle class="text-yellow-900">
                                 Verify Your Phone Number
@@ -150,15 +154,15 @@ watch(() => page.props.flash, (flash: any) => {
                             v-if="sendForm.processing"
                             class="mr-2 h-4 w-4 animate-spin"
                         />
-                        {{ sendForm.processing ? 'Sending...' : 'Send Verification Code' }}
+                        {{
+                            sendForm.processing
+                                ? 'Sending...'
+                                : 'Send Verification Code'
+                        }}
                     </Button>
                 </div>
 
-                <form
-                    v-else
-                    class="space-y-4"
-                    @submit.prevent="submitOtp"
-                >
+                <form v-else class="space-y-4" @submit.prevent="submitOtp">
                     <div class="space-y-3">
                         <p class="text-sm font-medium text-yellow-900">
                             Enter the 6-digit code sent to your WhatsApp

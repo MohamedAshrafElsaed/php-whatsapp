@@ -20,7 +20,7 @@ import {
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -80,8 +80,8 @@ const selectedIndustry = ref(user.industry || '');
 // Filter industries based on search
 const filteredIndustries = computed(() => {
     if (!industrySearch.value) return industries;
-    return industries.filter(industry =>
-        industry.toLowerCase().includes(industrySearch.value.toLowerCase())
+    return industries.filter((industry) =>
+        industry.toLowerCase().includes(industrySearch.value.toLowerCase()),
     );
 });
 </script>
@@ -144,7 +144,13 @@ const filteredIndustries = computed(() => {
                         <InputError :message="errors.email" class="mt-2" />
                     </div>
 
-                    <div v-if="mustVerifyEmail && user.email && !user.email_verified_at">
+                    <div
+                        v-if="
+                            mustVerifyEmail &&
+                            user.email &&
+                            !user.email_verified_at
+                        "
+                    >
                         <p class="-mt-4 text-sm text-muted-foreground">
                             Your email address is unverified.
                             <Link
@@ -169,14 +175,16 @@ const filteredIndustries = computed(() => {
                         <Label for="industry">Industry (Optional)</Label>
                         <Select v-model="selectedIndustry" name="industry">
                             <SelectTrigger>
-                                <SelectValue placeholder="Select your industry" />
+                                <SelectValue
+                                    placeholder="Select your industry"
+                                />
                             </SelectTrigger>
                             <SelectContent>
                                 <div class="p-2">
                                     <Input
                                         v-model="industrySearch"
-                                        placeholder="Search industries..."
                                         class="mb-2"
+                                        placeholder="Search industries..."
                                         @click.stop
                                     />
                                 </div>
@@ -203,7 +211,8 @@ const filteredIndustries = computed(() => {
                             type="text"
                         />
                         <p class="text-xs text-muted-foreground">
-                            Phone number cannot be changed. Contact support if needed.
+                            Phone number cannot be changed. Contact support if
+                            needed.
                         </p>
                     </div>
 
@@ -211,7 +220,7 @@ const filteredIndustries = computed(() => {
                         <Button
                             :disabled="processing"
                             data-test="update-profile-button"
-                        >Save
+                            >Save
                         </Button>
 
                         <Transition

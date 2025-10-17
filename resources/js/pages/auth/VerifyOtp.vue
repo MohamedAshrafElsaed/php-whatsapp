@@ -104,9 +104,7 @@ const submitOtp = () => {
                 </div>
 
                 <Button
-                    :disabled="
-                        verifyForm.processing || codeValue.length !== 6
-                    "
+                    :disabled="verifyForm.processing || codeValue.length !== 6"
                     class="w-full"
                     type="submit"
                 >

@@ -55,15 +55,22 @@ const goBack = () => {
                     >
                         ← Back to Imports
                     </Button>
-                    <h1 class="text-2xl font-bold">{{ importData.filename }}</h1>
+                    <h1 class="text-2xl font-bold">
+                        {{ importData.filename }}
+                    </h1>
                     <p class="text-muted-foreground">
                         Uploaded
-                        {{ new Date(importData.created_at).toLocaleDateString() }}
+                        {{
+                            new Date(importData.created_at).toLocaleDateString()
+                        }}
                     </p>
                 </div>
 
                 <Button
-                    v-if="importData.status === 'ready' && importData.valid_rows > 0"
+                    v-if="
+                        importData.status === 'ready' &&
+                        importData.valid_rows > 0
+                    "
                     size="lg"
                     @click="createCampaign"
                 >
@@ -110,59 +117,59 @@ const goBack = () => {
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="border-b bg-muted/50">
-                        <tr>
-                            <th class="p-4 text-left font-medium">
-                                Status
-                            </th>
-                            <th class="p-4 text-left font-medium">Phone</th>
-                            <th class="p-4 text-left font-medium">Name</th>
-                            <th class="p-4 text-left font-medium">Email</th>
-                            <th class="p-4 text-left font-medium">
-                                Errors
-                            </th>
-                        </tr>
+                            <tr>
+                                <th class="p-4 text-left font-medium">
+                                    Status
+                                </th>
+                                <th class="p-4 text-left font-medium">Phone</th>
+                                <th class="p-4 text-left font-medium">Name</th>
+                                <th class="p-4 text-left font-medium">Email</th>
+                                <th class="p-4 text-left font-medium">
+                                    Errors
+                                </th>
+                            </tr>
                         </thead>
                         <tbody>
-                        <tr
-                            v-for="recipient in recipients"
-                            :key="recipient.id"
-                            class="border-b hover:bg-muted/30"
-                        >
-                            <td class="p-4">
-                                <Badge
-                                    :variant="
+                            <tr
+                                v-for="recipient in recipients"
+                                :key="recipient.id"
+                                class="border-b hover:bg-muted/30"
+                            >
+                                <td class="p-4">
+                                    <Badge
+                                        :variant="
                                             recipient.is_valid
                                                 ? 'default'
                                                 : 'destructive'
                                         "
-                                >
+                                    >
+                                        {{
+                                            recipient.is_valid
+                                                ? 'Valid'
+                                                : 'Invalid'
+                                        }}
+                                    </Badge>
+                                </td>
+                                <td class="p-4 font-mono text-sm">
                                     {{
-                                        recipient.is_valid
-                                            ? 'Valid'
-                                            : 'Invalid'
+                                        recipient.phone_e164 ||
+                                        recipient.phone_raw
                                     }}
-                                </Badge>
-                            </td>
-                            <td class="p-4 font-mono text-sm">
-                                {{
-                                    recipient.phone_e164 ||
-                                    recipient.phone_raw
-                                }}
-                            </td>
-                            <td class="p-4">
-                                {{
-                                    [
-                                        recipient.first_name,
-                                        recipient.last_name,
-                                    ]
-                                        .filter(Boolean)
-                                        .join(' ') || '-'
-                                }}
-                            </td>
-                            <td class="p-4 text-sm text-muted-foreground">
-                                {{ recipient.email || '-' }}
-                            </td>
-                            <td class="p-4">
+                                </td>
+                                <td class="p-4">
+                                    {{
+                                        [
+                                            recipient.first_name,
+                                            recipient.last_name,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ') || '-'
+                                    }}
+                                </td>
+                                <td class="p-4 text-sm text-muted-foreground">
+                                    {{ recipient.email || '-' }}
+                                </td>
+                                <td class="p-4">
                                     <span
                                         v-if="recipient.validation_errors_json"
                                         class="text-sm text-red-600"
@@ -173,13 +180,13 @@ const goBack = () => {
                                             )
                                         }}
                                     </span>
-                                <span
-                                    v-else
-                                    class="text-sm text-muted-foreground"
-                                >-</span
-                                >
-                            </td>
-                        </tr>
+                                    <span
+                                        v-else
+                                        class="text-sm text-muted-foreground"
+                                        >-</span
+                                    >
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

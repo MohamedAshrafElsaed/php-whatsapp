@@ -21,18 +21,18 @@ defineProps<Props>();
     >
         <!-- Gradient definitions -->
         <defs>
-            <linearGradient id="bgGradient" x1="0" y1="0" x2="166" y2="166">
-                <stop offset="0%" stop-color="#25D366"/>
-                <stop offset="100%" stop-color="#128C7E"/>
+            <linearGradient id="bgGradient" x1="0" x2="166" y1="0" y2="166">
+                <stop offset="0%" stop-color="#25D366" />
+                <stop offset="100%" stop-color="#128C7E" />
             </linearGradient>
-            <linearGradient id="bubbleGradient" x1="0" y1="0" x2="100" y2="100">
-                <stop offset="0%" stop-color="#ffffff"/>
-                <stop offset="100%" stop-color="#f0f0f0"/>
+            <linearGradient id="bubbleGradient" x1="0" x2="100" y1="0" y2="100">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="100%" stop-color="#f0f0f0" />
             </linearGradient>
         </defs>
 
         <!-- Background -->
-        <rect width="166" height="166" rx="32" fill="url(#bgGradient)"/>
+        <rect fill="url(#bgGradient)" height="166" rx="32" width="166" />
 
         <!-- Main message bubble -->
         <path
@@ -43,34 +43,58 @@ defineProps<Props>();
         />
 
         <!-- Message lines with animation feel -->
-        <rect x="55" y="60" width="56" height="6" rx="3" fill="#25D366" opacity="0.9"/>
-        <rect x="55" y="72" width="46" height="6" rx="3" fill="#25D366" opacity="0.7"/>
-        <rect x="55" y="84" width="36" height="6" rx="3" fill="#25D366" opacity="0.5"/>
+        <rect
+            fill="#25D366"
+            height="6"
+            opacity="0.9"
+            rx="3"
+            width="56"
+            x="55"
+            y="60"
+        />
+        <rect
+            fill="#25D366"
+            height="6"
+            opacity="0.7"
+            rx="3"
+            width="46"
+            x="55"
+            y="72"
+        />
+        <rect
+            fill="#25D366"
+            height="6"
+            opacity="0.5"
+            rx="3"
+            width="36"
+            x="55"
+            y="84"
+        />
 
         <!-- Send icon -->
-        <path d="M100 91L111 85L100 79V85L105 87.5L100 91Z" fill="#128C7E"/>
+        <path d="M100 91L111 85L100 79V85L105 87.5L100 91Z" fill="#128C7E" />
 
         <!-- Connection lines -->
         <path
             d="M116 65L122 45"
             stroke="white"
-            stroke-width="2"
-            stroke-opacity="0.3"
             stroke-dasharray="4 4"
+            stroke-opacity="0.3"
+            stroke-width="2"
         />
         <path
             d="M118 82L128 78"
             stroke="white"
-            stroke-width="2"
-            stroke-opacity="0.3"
             stroke-dasharray="4 4"
+            stroke-opacity="0.3"
+            stroke-width="2"
         />
         <path
             d="M112 100L123 105"
             stroke="white"
-            stroke-width="2"
-            stroke-opacity="0.3"
             stroke-dasharray="4 4"
+            stroke-opacity="0.3"
+            stroke-width="2"
         />
     </svg>
 </template>

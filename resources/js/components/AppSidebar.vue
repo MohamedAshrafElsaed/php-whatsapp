@@ -14,7 +14,14 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, MessageSquare, Send, Users, Upload, MessageSquareText } from 'lucide-vue-next';
+import {
+    LayoutGrid,
+    MessageSquare,
+    MessageSquareText,
+    Send,
+    Upload,
+    Users,
+} from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [

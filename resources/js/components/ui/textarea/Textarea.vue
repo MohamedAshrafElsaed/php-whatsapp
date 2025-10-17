@@ -2,7 +2,6 @@
 import type { HTMLAttributes } from 'vue';
 import { cn } from '@/lib/utils';
 import { useVModel } from '@vueuse/core';
-import { computed } from 'vue';
 
 interface Props {
     defaultValue?: string | number;
@@ -18,7 +17,7 @@ const emits = defineEmits<{
 
 const modelValue = useVModel(props, 'modelValue', emits, {
     passive: true,
-    defaultValue: props.defaultValue,
+    defaultValue: props.defaultValue
 });
 </script>
 

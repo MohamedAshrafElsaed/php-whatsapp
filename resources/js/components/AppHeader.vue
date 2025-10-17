@@ -21,7 +21,13 @@ import { dashboard } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 import type { InertiaLinkProps } from '@inertiajs/vue3';
 import { Link, usePage } from '@inertiajs/vue3';
-import { LayoutGrid, MessageSquare, Users, Upload, Send } from 'lucide-vue-next';
+import {
+    LayoutGrid,
+    MessageSquare,
+    Send,
+    Upload,
+    Users,
+} from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppearanceToggle from './AppearanceToggle.vue';
 import UserMenu from './UserMenu.vue';
