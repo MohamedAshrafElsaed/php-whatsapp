@@ -222,9 +222,7 @@ class WaSessionController extends Controller
             }
 
             // Create bridge client
-            $bridgeUrl = rtrim($instance['url'], '/') . ':' . $instance['port'];
-            $bridge = new \App\Services\BridgeClient($bridgeUrl, $deviceId);
-
+            $bridge = new \App\Services\BridgeClient($instance['bridge_url'], $deviceId);
             // Get QR code
             $response = $bridge->getQrCode();
 
@@ -259,7 +257,7 @@ class WaSessionController extends Controller
             Log::info('QR generated successfully', [
                 'user_id' => $user->id,
                 'device_id' => $deviceId,
-                'bridge' => $bridgeUrl,
+                'bridge' => $instance['bridge_url'],
             ]);
 
             return response()->json([
