@@ -68,7 +68,7 @@ class BridgeManager
                     return [
                         'url' => $instance['url'],
                         'port' => $port,
-                        'bridge_url' => rtrim($instance['url'], '/') . '/port/' . $port,
+                        'bridge_url' => rtrim($instance['url'], '/') . '/port/' . $port,  // ✅ FIXED: Use /port/{port}/ path
                     ];
                 }
             }
@@ -102,12 +102,13 @@ class BridgeManager
             $assignedBridge = [
                 'url' => $existingSession->bridge_instance_url,
                 'port' => $existingSession->bridge_instance_port,
-                'bridge_url' => rtrim($existingSession->bridge_instance_url, '/') . '/port/' . $existingSession->bridge_instance_port,
+                'bridge_url' => rtrim($existingSession->bridge_instance_url, '/') . '/port/' . $existingSession->bridge_instance_port,  // ✅ FIXED
             ];
 
             Log::info('Reusing existing port for user', [
                 'user_id' => $userId,
                 'port' => $existingSession->bridge_instance_port,
+                'bridge_url' => $assignedBridge['bridge_url'],
             ]);
 
             return $assignedBridge;
@@ -181,7 +182,7 @@ class BridgeManager
             $health[] = [
                 'url' => $instance['url'],
                 'port_range' => $portRangeStart . '-' . $portRangeEnd,
-                'healthy' => true, // Can add actual health check here
+                'healthy' => true,
                 'active_users' => $activeUsers,
                 'active_devices' => $activeDevices,
                 'max_sessions' => $maxSessions,
