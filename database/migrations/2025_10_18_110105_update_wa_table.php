@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false)->after('bridge_instance_port');
 
             // Remove unique constraint from user_id
-            $table->dropUnique(['user_id']);
+//            $table->dropUnique(['user_id']);
 
             // Add composite unique constraint
             $table->unique(['user_id', 'device_id']);
