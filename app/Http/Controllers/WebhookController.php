@@ -16,6 +16,8 @@ class WebhookController extends Controller
      */
     public function handle(Request $request)
     {
+        Log::info('CallBack', $request->all());
+
         // Verify webhook signature
         if (!$this->verifySignature($request)) {
             Log::warning('Invalid webhook signature', ['ip' => $request->ip()]);
@@ -35,6 +37,24 @@ class WebhookController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Verify HMAC signature
+     */
+    private function verifySignature(Request $request): bool
+    {
+        $signature = $request->header('X-Hub-Signature-256');
+        if (!$signature) {
+            return false;
+        }
+
+        $payload = $request->getContent();
+        $secret = config('services.bridge.webhook_secret');
+
+        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
+
+        return hash_equals($expectedSignature, $signature);
     }
 
     /**
@@ -185,23 +205,5 @@ class WebhookController extends Controller
                 ]);
                 break;
         }
-    }
-
-    /**
-     * Verify HMAC signature
-     */
-    private function verifySignature(Request $request): bool
-    {
-        $signature = $request->header('X-Hub-Signature-256');
-        if (!$signature) {
-            return false;
-        }
-
-        $payload = $request->getContent();
-        $secret = config('services.bridge.webhook_secret');
-
-        $expectedSignature = 'sha256=' . hash_hmac('sha256', $payload, $secret);
-
-        return hash_equals($expectedSignature, $signature);
     }
 }

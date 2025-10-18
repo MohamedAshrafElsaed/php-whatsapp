@@ -310,18 +310,38 @@ class BridgeClient
     public function getMyContacts(): array
     {
         try {
+            Log::info('Calling getMyContacts', [
+                'base_url' => $this->baseUrl,
+                'device_id' => $this->deviceId,
+            ]);
+
             $response = $this->getClient()
                 ->timeout(30)
                 ->get("{$this->baseUrl}/user/my/contacts");
+
+            Log::info('getMyContacts response received', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+            ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get contacts: ' . $response->body());
             }
 
-            return $response->json();
+            $data = $response->json();
+
+            Log::info('getMyContacts parsed data', [
+                'has_code' => isset($data['code']),
+                'code' => $data['code'] ?? null,
+                'has_results' => isset($data['results']),
+            ]);
+
+            return $data;
         } catch (\Exception $e) {
             Log::error('BridgeClient getMyContacts error', [
+                'base_url' => $this->baseUrl,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }

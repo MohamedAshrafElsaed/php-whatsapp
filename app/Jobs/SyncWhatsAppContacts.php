@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\WaSession;
-use App\Services\BridgeClient;
+use App\Services\BridgeManager;
 use App\Services\ContactSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,10 +23,20 @@ class SyncWhatsAppContacts implements ShouldQueue
     public function handle(): void
     {
         try {
-            $bridgeClient = new BridgeClient(
-                $this->waSession->bridge_url,
-                $this->waSession->device_id
-            );
+            Log::info('Contact sync job started', [
+                'wa_session_id' => $this->waSession->id,
+                'user_id' => $this->waSession->user_id,
+                'bridge_url' => $this->waSession->getBridgeUrl(),
+            ]);
+
+            // Use BridgeManager to get the correct client for this session
+            $bridgeManager = app(BridgeManager::class);
+            $bridgeClient = $bridgeManager->getClientForSession($this->waSession);
+
+            Log::info('BridgeClient created', [
+                'base_url' => $bridgeClient->getBaseUrl(),
+                'device_id' => $bridgeClient->getDeviceId(),
+            ]);
 
             $syncService = new ContactSyncService($bridgeClient);
             $result = $syncService->syncContacts($this->waSession);
@@ -46,6 +56,7 @@ class SyncWhatsAppContacts implements ShouldQueue
             Log::error('Contact sync job failed', [
                 'wa_session_id' => $this->waSession->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
