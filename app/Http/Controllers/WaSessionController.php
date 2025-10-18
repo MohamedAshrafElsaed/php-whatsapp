@@ -205,9 +205,6 @@ class WaSessionController extends Controller
             // This prevents false positives from old sessions
             $this->bridgeManager->clearUserBridgeSessions($user->id);
 
-            // Wait for cleanup
-//            sleep(1);
-
             // Generate unique device ID
             $deviceId = $this->bridgeManager->generateDeviceId($user->id);
 
@@ -221,8 +218,9 @@ class WaSessionController extends Controller
                 ], 503);
             }
 
-            // Create bridge client
+            // ✅ FIXED: Use bridge_url directly from instance
             $bridge = new \App\Services\BridgeClient($instance['bridge_url'], $deviceId);
+
             // Get QR code
             $response = $bridge->getQrCode();
 
@@ -257,7 +255,8 @@ class WaSessionController extends Controller
             Log::info('QR generated successfully', [
                 'user_id' => $user->id,
                 'device_id' => $deviceId,
-                'bridge' => $instance['bridge_url'],
+                'bridge_url' => $instance['bridge_url'],  // ✅ Log the correct URL
+                'port' => $instance['port'],
             ]);
 
             return response()->json([
@@ -306,20 +305,20 @@ class WaSessionController extends Controller
             $deviceId = $this->bridgeManager->generateDeviceId($user->id);
 
             // Get available bridge instance
-            $bridge = $this->bridgeManager->createClientForNewSession($deviceId);
+            $instance = $this->bridgeManager->getDedicatedInstanceForUser($user->id);
 
-            if (!$bridge) {
+            if (!$instance) {
                 return response()->json([
                     'success' => false,
                     'error' => 'No available WhatsApp bridge servers',
                 ], 503);
             }
 
+            // ✅ FIXED: Use bridge_url directly
+            $bridge = new \App\Services\BridgeClient($instance['bridge_url'], $deviceId);
+
             // Get pairing code
             $response = $bridge->getPairingCode($validated['phone']);
-
-            // Get instance assignment
-            $instance = $this->bridgeManager->getLeastLoadedInstance();
 
             $deviceCount = $this->bridgeManager->getDeviceCount($user->id);
 
