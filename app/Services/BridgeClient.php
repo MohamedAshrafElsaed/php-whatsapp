@@ -13,9 +13,20 @@ class BridgeClient
 
     public function __construct(?string $baseUrl = null, ?string $deviceId = null)
     {
+        // baseUrl should include the port path: https://api.whatsapp-sender.online/port/3001
         $this->baseUrl = $baseUrl ?? rtrim(config('services.bridge.url'), '/');
         $this->token = config('services.bridge.token');
         $this->deviceId = $deviceId ?? 'default';
+    }
+
+    /**
+     * Get HTTP client with authentication
+     */
+    private function getClient(): \Illuminate\Http\Client\PendingRequest
+    {
+        return Http::withHeaders([
+            'X-BRIDGE-TOKEN' => $this->token,
+        ]);
     }
 
     /**
@@ -29,7 +40,9 @@ class BridgeClient
     public function getDevices(): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/app/devices");
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/app/devices");
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -68,7 +81,9 @@ class BridgeClient
     public function getQrCode(): array
     {
         try {
-            $response = Http::timeout(30)->get("{$this->baseUrl}/app/login");
+            $response = $this->getClient()
+                ->timeout(30)
+                ->get("{$this->baseUrl}/app/login");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get QR code: ' . $response->body());
@@ -97,9 +112,11 @@ class BridgeClient
     public function getPairingCode(string $phone): array
     {
         try {
-            $response = Http::timeout(30)->get("{$this->baseUrl}/app/login-with-code", [
-                'phone' => $phone,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->get("{$this->baseUrl}/app/login-with-code", [
+                    'phone' => $phone,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get pairing code: ' . $response->body());
@@ -128,7 +145,9 @@ class BridgeClient
     public function logout(): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/app/logout");
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/app/logout");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to logout: ' . $response->body());
@@ -151,7 +170,9 @@ class BridgeClient
     public function reconnect(): array
     {
         try {
-            $response = Http::timeout(30)->get("{$this->baseUrl}/app/reconnect");
+            $response = $this->getClient()
+                ->timeout(30)
+                ->get("{$this->baseUrl}/app/reconnect");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to reconnect: ' . $response->body());
@@ -183,7 +204,9 @@ class BridgeClient
                 $url .= "?phone={$phone}";
             }
 
-            $response = Http::timeout(10)->get($url);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get($url);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get user info: ' . $response->body());
@@ -210,9 +233,11 @@ class BridgeClient
     public function updatePushname(string $pushName): array
     {
         try {
-            $response = Http::timeout(10)->post("{$this->baseUrl}/user/pushname", [
-                'push_name' => $pushName,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/user/pushname", [
+                    'push_name' => $pushName,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to update pushname: ' . $response->body());
@@ -234,7 +259,9 @@ class BridgeClient
     public function getPrivacy(): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/user/my/privacy");
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/user/my/privacy");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get privacy: ' . $response->body());
@@ -256,9 +283,11 @@ class BridgeClient
     public function checkPhone(string $phone): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/user/check", [
-                'phone' => $phone,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/user/check", [
+                    'phone' => $phone,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to check phone: ' . $response->body());
@@ -281,7 +310,9 @@ class BridgeClient
     public function getMyContacts(): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/user/my/contacts");
+            $response = $this->getClient()
+                ->timeout(30)
+                ->get("{$this->baseUrl}/user/my/contacts");
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get contacts: ' . $response->body());
@@ -303,9 +334,11 @@ class BridgeClient
     public function getBusinessProfile(string $phone): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/user/business-profile", [
-                'phone' => $phone,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/user/business-profile", [
+                    'phone' => $phone,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get business profile: ' . $response->body());
@@ -332,12 +365,14 @@ class BridgeClient
     public function getChats(int $offset = 0, int $limit = 10, string $search = ''): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/chats", [
-                'offset' => $offset,
-                'limit' => $limit,
-                'search' => $search,
-                'has_media' => false,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/chats", [
+                    'offset' => $offset,
+                    'limit' => $limit,
+                    'search' => $search,
+                    'has_media' => false,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get chats: ' . $response->body());
@@ -359,11 +394,13 @@ class BridgeClient
     public function getChatMessages(string $chatId, int $offset = 0, int $limit = 20): array
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/chat/{$chatId}/messages", [
-                'offset' => $offset,
-                'limit' => $limit,
-                'search' => '',
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->get("{$this->baseUrl}/chat/{$chatId}/messages", [
+                    'offset' => $offset,
+                    'limit' => $limit,
+                    'search' => '',
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to get chat messages: ' . $response->body());
@@ -386,9 +423,11 @@ class BridgeClient
     public function pinChat(string $chatId, bool $pinned): array
     {
         try {
-            $response = Http::timeout(10)->post("{$this->baseUrl}/chat/{$chatId}/pin", [
-                'pinned' => $pinned,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/chat/{$chatId}/pin", [
+                    'pinned' => $pinned,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to pin chat: ' . $response->body());
@@ -415,11 +454,13 @@ class BridgeClient
     public function sendMessage(string $phone, string $message, bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/send/message", [
-                'phone' => $phone,
-                'message' => $message,
-                'is_forwarded' => $isForwarded,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->post("{$this->baseUrl}/send/message", [
+                    'phone' => $phone,
+                    'message' => $message,
+                    'is_forwarded' => $isForwarded,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send message: ' . $response->body());
@@ -442,7 +483,8 @@ class BridgeClient
     public function sendImage(string $phone, $imageContents, string $fileName, string $caption = '', array $options = []): array
     {
         try {
-            $response = Http::timeout(90)
+            $response = $this->getClient()
+                ->timeout(90)
                 ->attach('image', $imageContents, $fileName)
                 ->post("{$this->baseUrl}/send/image", [
                     'phone' => $phone,
@@ -473,7 +515,8 @@ class BridgeClient
     public function sendVideo(string $phone, $videoContents, string $fileName, string $caption = '', array $options = []): array
     {
         try {
-            $response = Http::timeout(120)
+            $response = $this->getClient()
+                ->timeout(120)
                 ->attach('video', $videoContents, $fileName)
                 ->post("{$this->baseUrl}/send/video", [
                     'phone' => $phone,
@@ -504,7 +547,8 @@ class BridgeClient
     public function sendAudio(string $phone, $audioContents, string $fileName, bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(90)
+            $response = $this->getClient()
+                ->timeout(90)
                 ->attach('audio', $audioContents, $fileName)
                 ->post("{$this->baseUrl}/send/audio", [
                     'phone' => $phone,
@@ -533,7 +577,8 @@ class BridgeClient
     public function sendFile(string $phone, $fileContents, string $fileName, string $caption = '', bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(90)
+            $response = $this->getClient()
+                ->timeout(90)
                 ->attach('file', $fileContents, $fileName)
                 ->post("{$this->baseUrl}/send/file", [
                     'phone' => $phone,
@@ -562,12 +607,14 @@ class BridgeClient
     public function sendLink(string $phone, string $link, string $caption = '', bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/send/link", [
-                'phone' => $phone,
-                'link' => $link,
-                'caption' => $caption,
-                'is_forwarded' => $isForwarded,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->post("{$this->baseUrl}/send/link", [
+                    'phone' => $phone,
+                    'link' => $link,
+                    'caption' => $caption,
+                    'is_forwarded' => $isForwarded,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send link: ' . $response->body());
@@ -590,12 +637,14 @@ class BridgeClient
     public function sendLocation(string $phone, string $latitude, string $longitude, bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/send/location", [
-                'phone' => $phone,
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'is_forwarded' => $isForwarded,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->post("{$this->baseUrl}/send/location", [
+                    'phone' => $phone,
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'is_forwarded' => $isForwarded,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send location: ' . $response->body());
@@ -618,12 +667,14 @@ class BridgeClient
     public function sendContact(string $phone, string $contactName, string $contactPhone, bool $isForwarded = false): array
     {
         try {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/send/contact", [
-                'phone' => $phone,
-                'contact_name' => $contactName,
-                'contact_phone' => $contactPhone,
-                'is_forwarded' => $isForwarded,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->post("{$this->baseUrl}/send/contact", [
+                    'phone' => $phone,
+                    'contact_name' => $contactName,
+                    'contact_phone' => $contactPhone,
+                    'is_forwarded' => $isForwarded,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send contact: ' . $response->body());
@@ -646,12 +697,14 @@ class BridgeClient
     public function sendPoll(string $phone, string $question, array $options, int $maxAnswer = 1): array
     {
         try {
-            $response = Http::timeout(30)->post("{$this->baseUrl}/send/poll", [
-                'phone' => $phone,
-                'question' => $question,
-                'options' => $options,
-                'max_answer' => $maxAnswer,
-            ]);
+            $response = $this->getClient()
+                ->timeout(30)
+                ->post("{$this->baseUrl}/send/poll", [
+                    'phone' => $phone,
+                    'question' => $question,
+                    'options' => $options,
+                    'max_answer' => $maxAnswer,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send poll: ' . $response->body());
@@ -674,9 +727,11 @@ class BridgeClient
     public function sendPresence(string $type): array
     {
         try {
-            $response = Http::timeout(10)->post("{$this->baseUrl}/send/presence", [
-                'type' => $type,
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/send/presence", [
+                    'type' => $type,
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send presence: ' . $response->body());
@@ -699,10 +754,12 @@ class BridgeClient
     public function sendChatPresence(string $phone, string $action): array
     {
         try {
-            $response = Http::timeout(10)->post("{$this->baseUrl}/send/chat-presence", [
-                'phone' => $phone,
-                'action' => $action, // 'start' or 'stop'
-            ]);
+            $response = $this->getClient()
+                ->timeout(10)
+                ->post("{$this->baseUrl}/send/chat-presence", [
+                    'phone' => $phone,
+                    'action' => $action, // 'start' or 'stop'
+                ]);
 
             if ($response->failed()) {
                 throw new \Exception('Failed to send chat presence: ' . $response->body());
@@ -722,7 +779,6 @@ class BridgeClient
     /**
      * HELPER METHODS
      */
-
     public function getDeviceId(): string
     {
         return $this->deviceId;

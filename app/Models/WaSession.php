@@ -65,15 +65,17 @@ class WaSession extends Model
         return $query->where('is_primary', true);
     }
 
-    // Helper Methods
+    /**
+     * Get full bridge URL with port path
+     */
     public function getBridgeUrl(): string
     {
         if ($this->bridge_instance_url && $this->bridge_instance_port) {
-            return rtrim($this->bridge_instance_url, '/') . ':' . $this->bridge_instance_port;
+            return rtrim($this->bridge_instance_url, '/') . '/port/' . $this->bridge_instance_port;
         }
 
-        // Fallback to default bridge URL
-        return config('services.bridge.url');
+        // Fallback to default
+        return rtrim(config('services.bridge.url'), '/') . '/port/3001';
     }
 
     public function isConnected(): bool

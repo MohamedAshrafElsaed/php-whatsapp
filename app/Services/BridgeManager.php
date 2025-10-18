@@ -32,6 +32,57 @@ class BridgeManager
     }
 
     /**
+     * Get available port for a new session
+     * Returns the first available port in the range
+     */
+    public function getAvailablePort(int $userId): ?array
+    {
+        $instances = $this->getAvailableInstances();
+
+        foreach ($instances as $instance) {
+            $portRangeStart = $instance['port_range_start'];
+            $portRangeEnd = $instance['port_range_end'];
+
+            // Get all used ports for this instance
+            $usedPorts = WaSession::where('bridge_instance_url', $instance['url'])
+                ->whereBetween('bridge_instance_port', [$portRangeStart, $portRangeEnd])
+                ->whereIn('status', ['pending', 'connected'])
+                ->pluck('bridge_instance_port')
+                ->toArray();
+
+            Log::info('Checking available ports', [
+                'url' => $instance['url'],
+                'port_range' => "{$portRangeStart}-{$portRangeEnd}",
+                'used_ports_count' => count($usedPorts),
+            ]);
+
+            // Find first available port in range
+            for ($port = $portRangeStart; $port <= $portRangeEnd; $port++) {
+                if (!in_array($port, $usedPorts)) {
+                    Log::info('Available port found', [
+                        'url' => $instance['url'],
+                        'port' => $port,
+                        'user_id' => $userId,
+                    ]);
+
+                    return [
+                        'url' => $instance['url'],
+                        'port' => $port,
+                        'bridge_url' => rtrim($instance['url'], '/') . '/port/' . $port,
+                    ];
+                }
+            }
+        }
+
+        Log::warning('No available ports in any instance', [
+            'user_id' => $userId,
+            'total_instances' => count($instances),
+        ]);
+
+        return null;
+    }
+
+    /**
      * AUTOMATIC: Get or assign bridge instance for user
      * No manual configuration needed!
      */
@@ -39,64 +90,31 @@ class BridgeManager
     {
         $instances = $this->getAvailableInstances();
 
-        // Strategy 1: Check if user already has a session (stick to same bridge)
+        // Strategy 1: Check if user already has a session (stick to same port)
         $existingSession = WaSession::where('user_id', $userId)
             ->whereNotNull('bridge_instance_url')
             ->whereNotNull('bridge_instance_port')
+            ->whereIn('status', ['pending', 'connected'])
+            ->orderBy('created_at', 'desc')
             ->first();
 
-        if ($existingSession) {
+        if ($existingSession && $existingSession->bridge_instance_port) {
             $assignedBridge = [
                 'url' => $existingSession->bridge_instance_url,
                 'port' => $existingSession->bridge_instance_port,
-                'max_sessions' => config('services.bridge.max_devices_per_user', 3),
+                'bridge_url' => rtrim($existingSession->bridge_instance_url, '/') . '/port/' . $existingSession->bridge_instance_port,
             ];
 
-            Log::info('Reusing existing bridge for user', [
+            Log::info('Reusing existing port for user', [
                 'user_id' => $userId,
-                'bridge' => $assignedBridge,
+                'port' => $existingSession->bridge_instance_port,
             ]);
 
             return $assignedBridge;
         }
 
-        // Strategy 2: Find least loaded bridge (automatic load balancing)
-        $leastLoadedBridge = null;
-        $lowestLoad = PHP_INT_MAX;
-
-        foreach ($instances as $instance) {
-            // Count active users on this bridge (not sessions, users!)
-            $activeUsers = WaSession::where('bridge_instance_url', $instance['url'])
-                ->where('bridge_instance_port', $instance['port'])
-                ->whereIn('status', ['connected', 'pending'])
-                ->distinct('user_id')
-                ->count('user_id');
-
-            // Calculate user capacity per bridge
-            $userCapacity = floor($instance['max_sessions'] / config('services.bridge.max_devices_per_user', 3));
-
-            if ($activeUsers < $userCapacity && $activeUsers < $lowestLoad) {
-                $lowestLoad = $activeUsers;
-                $leastLoadedBridge = $instance;
-            }
-        }
-
-        if ($leastLoadedBridge) {
-            Log::info('Auto-assigned user to least loaded bridge', [
-                'user_id' => $userId,
-                'bridge' => $leastLoadedBridge,
-                'current_users' => $lowestLoad,
-            ]);
-
-            return $leastLoadedBridge;
-        }
-
-        Log::error('All bridge instances at capacity', [
-            'user_id' => $userId,
-            'total_instances' => count($instances),
-        ]);
-
-        return null;
+        // Strategy 2: Get new available port
+        return $this->getAvailablePort($userId);
     }
 
     /**
@@ -121,17 +139,15 @@ class BridgeManager
     /**
      * Create new bridge client for new session
      */
-    public function createClientForNewSession(string $deviceId): ?BridgeClient
+    public function createClientForNewSession(string $deviceId, int $userId): ?BridgeClient
     {
-        $instance = $this->getDedicatedInstanceForUser(auth()->id());
+        $instance = $this->getDedicatedInstanceForUser($userId);
 
         if (!$instance) {
             return null;
         }
 
-        $bridgeUrl = rtrim($instance['url'], '/') . ':' . $instance['port'];
-
-        return new BridgeClient($bridgeUrl, $deviceId);
+        return new BridgeClient($instance['bridge_url'], $deviceId);
     }
 
     /**
@@ -143,33 +159,34 @@ class BridgeManager
         $health = [];
 
         foreach ($instances as $instance) {
-            $url = rtrim($instance['url'], '/') . ':' . $instance['port'];
-            $isHealthy = $this->checkInstanceHealth($url);
+            $portRangeStart = $instance['port_range_start'] ?? $instance['port'];
+            $portRangeEnd = $instance['port_range_end'] ?? $instance['port'];
 
             // Count unique users (not sessions)
             $activeUsers = WaSession::where('bridge_instance_url', $instance['url'])
-                ->where('bridge_instance_port', $instance['port'])
+                ->whereBetween('bridge_instance_port', [$portRangeStart, $portRangeEnd])
                 ->whereIn('status', ['connected', 'pending'])
                 ->distinct('user_id')
                 ->count('user_id');
 
             $activeDevices = WaSession::where('bridge_instance_url', $instance['url'])
-                ->where('bridge_instance_port', $instance['port'])
+                ->whereBetween('bridge_instance_port', [$portRangeStart, $portRangeEnd])
                 ->whereIn('status', ['connected', 'pending'])
                 ->count();
 
-            $userCapacity = floor($instance['max_sessions'] / config('services.bridge.max_devices_per_user', 3));
+            $maxSessions = $instance['max_sessions'];
+            $availablePorts = $maxSessions - $activeDevices;
+            $capacityPercent = $maxSessions > 0 ? round(($activeDevices / $maxSessions) * 100, 2) : 0;
 
             $health[] = [
-                'url' => $url,
-                'healthy' => $isHealthy,
+                'url' => $instance['url'],
+                'port_range' => $portRangeStart . '-' . $portRangeEnd,
+                'healthy' => true, // Can add actual health check here
                 'active_users' => $activeUsers,
                 'active_devices' => $activeDevices,
-                'max_users' => $userCapacity,
-                'max_devices' => $instance['max_sessions'],
-                'user_capacity' => round(($activeUsers / $userCapacity) * 100, 2) . '%',
-                'device_capacity' => round(($activeDevices / $instance['max_sessions']) * 100, 2) . '%',
-                'available_user_slots' => $userCapacity - $activeUsers,
+                'max_sessions' => $maxSessions,
+                'available_ports' => $availablePorts,
+                'capacity_percent' => $capacityPercent,
             ];
         }
 
@@ -185,7 +202,7 @@ class BridgeManager
 
         return Cache::remember($cacheKey, 60, function () use ($url) {
             try {
-                $response = \Http::timeout(5)->get("{$url}/app/devices");
+                $response = \Http::timeout(5)->get("{$url}/health");
                 return $response->successful();
             } catch (\Exception $e) {
                 Log::warning("Bridge health check failed for {$url}", [
@@ -224,7 +241,7 @@ class BridgeManager
      */
     public function getDeviceLimit(int $userId): int
     {
-        return config('services.bridge.max_devices_per_user', 3);
+        return config('services.bridge.max_devices_per_user', 1);
     }
 
     /**
@@ -232,7 +249,9 @@ class BridgeManager
      */
     public function canAddDevice(int $userId): bool
     {
-        $currentCount = WaSession::where('user_id', $userId)->count();
+        $currentCount = WaSession::where('user_id', $userId)
+            ->whereIn('status', ['pending', 'connected'])
+            ->count();
         return $currentCount < $this->getDeviceLimit($userId);
     }
 
@@ -245,47 +264,30 @@ class BridgeManager
     }
 
     /**
-     * Clear all sessions for a user's bridge instance
-     * Only clears if user is the ONLY user on that bridge
+     * Clear user's bridge sessions (logout from specific port)
      */
     public function clearUserBridgeSessions(int $userId): void
     {
-        $instance = $this->getDedicatedInstanceForUser($userId);
+        $sessions = WaSession::where('user_id', $userId)
+            ->whereIn('status', ['pending', 'connected'])
+            ->get();
 
-        if (!$instance) {
-            return;
-        }
-
-        // Count how many OTHER users are on this bridge
-        $otherUsers = WaSession::where('bridge_instance_url', $instance['url'])
-            ->where('bridge_instance_port', $instance['port'])
-            ->where('user_id', '!=', $userId)
-            ->whereIn('status', ['connected', 'pending'])
-            ->distinct('user_id')
-            ->count('user_id');
-
-        // Only clear if this user is alone on the bridge
-        if ($otherUsers === 0) {
-            $bridgeUrl = rtrim($instance['url'], '/') . ':' . $instance['port'];
-            $bridge = new BridgeClient($bridgeUrl, 'temp');
-
+        foreach ($sessions as $session) {
             try {
+                $bridge = $this->getClientForSession($session);
                 $bridge->logout();
-                Log::info('Cleared bridge sessions (user was alone on bridge)', [
+
+                Log::info('Cleared session for user', [
                     'user_id' => $userId,
-                    'bridge_url' => $bridgeUrl,
+                    'port' => $session->bridge_instance_port,
                 ]);
             } catch (\Exception $e) {
-                Log::warning('Failed to clear bridge sessions', [
+                Log::warning('Failed to clear session', [
                     'user_id' => $userId,
+                    'port' => $session->bridge_instance_port,
                     'error' => $e->getMessage(),
                 ]);
             }
-        } else {
-            Log::info('Skipped bridge clear (other users present)', [
-                'user_id' => $userId,
-                'other_users' => $otherUsers,
-            ]);
         }
     }
 }
