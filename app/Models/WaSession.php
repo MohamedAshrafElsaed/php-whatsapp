@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WaSession extends Model
 {
@@ -12,21 +13,67 @@ class WaSession extends Model
 
     protected $fillable = [
         'user_id',
+        'device_id',
+        'device_label',
+        'bridge_instance_url',
+        'bridge_instance_port',
+        'is_primary',
         'status',
         'meta_json',
         'last_seen_at',
+        'last_heartbeat_at',
         'expires_at',
     ];
 
     protected $casts = [
         'meta_json' => 'array',
+        'is_primary' => 'boolean',
         'last_seen_at' => 'datetime',
+        'last_heartbeat_at' => 'datetime',
         'expires_at' => 'datetime',
     ];
 
+    // Relationships
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'wa_session_id');
+    }
+
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class, 'wa_session_id');
+    }
+
+    // Scopes
+    public function scopeConnected($query)
+    {
+        return $query->where('status', 'connected');
+    }
+
+    public function scopeForUser($query, $userId)
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    public function scopePrimary($query)
+    {
+        return $query->where('is_primary', true);
+    }
+
+    // Helper Methods
+    public function getBridgeUrl(): string
+    {
+        if ($this->bridge_instance_url && $this->bridge_instance_port) {
+            return rtrim($this->bridge_instance_url, '/') . ':' . $this->bridge_instance_port;
+        }
+
+        // Fallback to default bridge URL
+        return config('services.bridge.url');
     }
 
     public function isConnected(): bool
@@ -34,14 +81,41 @@ class WaSession extends Model
         return $this->status === 'connected';
     }
 
-    public function isPending(): bool
-    {
-        return $this->status === 'pending';
-    }
-
     public function isExpired(): bool
     {
-        return $this->status === 'expired' ||
-            ($this->expires_at && $this->expires_at->isPast());
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    public function markAsExpired(): void
+    {
+        $this->update(['status' => 'expired']);
+    }
+
+    public function getPhoneNumber(): ?string
+    {
+        return $this->meta_json['phone'] ?? null;
+    }
+
+    public function getName(): ?string
+    {
+        return $this->meta_json['name'] ?? null;
+    }
+
+    public function updateConnection(array $data): void
+    {
+        $this->update([
+            'status' => 'connected',
+            'meta_json' => array_merge($this->meta_json ?? [], $data),
+            'last_seen_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+    }
+
+    /**
+     * Get all contacts for this session
+     */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(Contact::class);
     }
 }

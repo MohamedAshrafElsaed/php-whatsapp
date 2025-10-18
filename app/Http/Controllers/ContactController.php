@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Message;
 use App\Models\Recipient;
-use App\Services\BridgeClient;
+use App\Models\WaSession;
+use App\Services\BridgeManager;
 use App\Services\FacebookConversionsApiService;
 use Exception;
 use Illuminate\Http\RedirectResponse;
@@ -20,10 +21,9 @@ use Log;
 class ContactController extends Controller
 {
     public function __construct(
-        private readonly BridgeClient                  $bridge,
+        private readonly BridgeManager $bridgeManager,
         private readonly FacebookConversionsApiService $facebookService
-    )
-    {
+    ) {
     }
 
     /**
@@ -104,7 +104,7 @@ class ContactController extends Controller
 
         $contact = Recipient::create([
             'user_id' => $request->user()->id,
-            'import_id' => null, // Manual entry, no import
+            'import_id' => null,
             'phone_raw' => $phoneRaw,
             'phone_e164' => $phoneE164,
             'first_name' => $request->first_name,
@@ -146,6 +146,20 @@ class ContactController extends Controller
 
         $recipient->load('import');
 
+        // Get user's connected WhatsApp sessions
+        $sessions = WaSession::where('user_id', $request->user()->id)
+            ->where('status', 'connected')
+            ->orderBy('is_primary', 'desc')
+            ->get()
+            ->map(fn($session) => [
+                'id' => $session->id,
+                'device_id' => $session->device_id,
+                'device_label' => $session->device_label,
+                'phone' => $session->getPhoneNumber(),
+                'name' => $session->getName(),
+                'is_primary' => $session->is_primary,
+            ]);
+
         // Get message history (last 50 messages)
         $messages = Message::where('recipient_id', $recipient->id)
             ->where('user_id', $request->user()->id)
@@ -176,11 +190,12 @@ class ContactController extends Controller
                 'created_at' => $recipient->created_at->format('M d, Y'),
             ],
             'messages' => $messages,
+            'sessions' => $sessions,
         ]);
     }
 
     /**
-     * Send individual message to contact
+     * Send text message to contact
      */
     public function sendMessage(Request $request, Recipient $recipient): RedirectResponse
     {
@@ -188,22 +203,29 @@ class ContactController extends Controller
 
         $request->validate([
             'message' => 'required|string|max:4096',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
         ]);
 
         try {
+            // Get WhatsApp session
+            $session = $this->getActiveSession($request);
+
             // Create message record
             $message = Message::create([
-                'campaign_id' => null, // Individual message, not part of campaign
+                'campaign_id' => null,
                 'recipient_id' => $recipient->id,
                 'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
                 'phone_e164' => $recipient->phone_e164,
                 'body_rendered' => $request->message,
                 'status' => 'queued',
             ]);
 
-            // Send message immediately via bridge
-            $response = $this->bridge->sendMessage(
-                $request->user()->id,
+            // Get bridge client for this session
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            // Send message
+            $response = $bridge->sendMessage(
                 $recipient->phone_e164,
                 $request->message
             );
@@ -217,42 +239,16 @@ class ContactController extends Controller
             AuditLog::log('sent_message', 'Message', $message->id, [
                 'recipient_id' => $recipient->id,
                 'phone' => $recipient->phone_e164,
+                'session_id' => $session->id,
             ]);
 
-            // Track Contact event on Facebook (individual message sent)
-            try {
-                $userData = $this->facebookService->buildUserDataFromAuth();
-
-                $customData = [
-                    'content_name' => 'Individual Message Sent',
-                    'status' => 'completed',
-                ];
-
-                // Add recipient info if available
-                if ($recipient->first_name) {
-                    $customData['content_category'] = 'Direct Message';
-                }
-
-                $this->facebookService->trackContact($userData, $customData);
-
-                Log::info('Facebook Contact event tracked for individual message', [
-                    'user_id' => $request->user()->id,
-                    'message_id' => $message->id,
-                    'recipient_id' => $recipient->id,
-                ]);
-            } catch (Exception $e) {
-                Log::error('Failed to track Facebook Contact event', [
-                    'user_id' => $request->user()->id,
-                    'message_id' => $message->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            // Track Facebook event
+            $this->trackFacebookContact($request, $message, $recipient);
 
             return redirect()->route('contacts.show', $recipient)
                 ->with('success', 'Message sent successfully.');
 
         } catch (Exception $e) {
-            // Mark as failed if exists
             if (isset($message)) {
                 $message->update([
                     'status' => 'failed',
@@ -261,8 +257,264 @@ class ContactController extends Controller
                 ]);
             }
 
+            Log::error('Failed to send message', [
+                'recipient_id' => $recipient->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return redirect()->route('contacts.show', $recipient)
                 ->with('error', 'Failed to send message: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send media message (image, video, audio, file)
+     */
+    public function sendMedia(Request $request, Recipient $recipient): RedirectResponse
+    {
+        $this->authorize('view', $recipient);
+
+        $request->validate([
+            'media_type' => 'required|in:image,video,audio,file',
+            'media' => 'required|file|max:102400', // 100MB max
+            'caption' => 'nullable|string|max:1024',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
+        ]);
+
+        try {
+            $session = $this->getActiveSession($request);
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            $file = $request->file('media');
+            $mediaType = $request->media_type;
+            $caption = $request->caption ?? '';
+
+            // Get file contents and info
+            $fileContents = file_get_contents($file->getRealPath());
+            $fileName = $file->getClientOriginalName();
+            $mimeType = $file->getMimeType();
+
+            // Send based on type
+            switch ($mediaType) {
+                case 'image':
+                    $response = $bridge->sendImage($recipient->phone_e164, $fileContents, $fileName, $caption);
+                    break;
+                case 'video':
+                    $response = $bridge->sendVideo($recipient->phone_e164, $fileContents, $fileName, $caption);
+                    break;
+                case 'audio':
+                    $response = $bridge->sendAudio($recipient->phone_e164, $fileContents, $fileName);
+                    break;
+                case 'file':
+                    $response = $bridge->sendFile($recipient->phone_e164, $fileContents, $fileName, $caption);
+                    break;
+            }
+
+            // Create message record
+            $message = Message::create([
+                'campaign_id' => null,
+                'recipient_id' => $recipient->id,
+                'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
+                'phone_e164' => $recipient->phone_e164,
+                'body_rendered' => $caption ?: "[{$mediaType}]",
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            AuditLog::log('sent_media', 'Message', $message->id, [
+                'recipient_id' => $recipient->id,
+                'media_type' => $mediaType,
+            ]);
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('success', ucfirst($mediaType) . ' sent successfully.');
+
+        } catch (Exception $e) {
+            Log::error('Failed to send media', [
+                'recipient_id' => $recipient->id,
+                'media_type' => $request->media_type,
+                'error' => $e->getMessage(),
+            ]);
+            dd($e->getMessage());
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('error', 'Failed to send media: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send link with preview
+     */
+    public function sendLink(Request $request, Recipient $recipient): RedirectResponse
+    {
+        $this->authorize('view', $recipient);
+
+        $request->validate([
+            'link' => 'required|url|max:2048',
+            'caption' => 'nullable|string|max:1024',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
+        ]);
+
+        try {
+            $session = $this->getActiveSession($request);
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            $response = $bridge->sendLink(
+                $recipient->phone_e164,
+                $request->link,
+                $request->caption ?? ''
+            );
+
+            $message = Message::create([
+                'campaign_id' => null,
+                'recipient_id' => $recipient->id,
+                'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
+                'phone_e164' => $recipient->phone_e164,
+                'body_rendered' => $request->link . ($request->caption ? "\n\n" . $request->caption : ''),
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('success', 'Link sent successfully.');
+
+        } catch (Exception $e) {
+            return redirect()->route('contacts.show', $recipient)
+                ->with('error', 'Failed to send link: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send location
+     */
+    public function sendLocation(Request $request, Recipient $recipient): RedirectResponse
+    {
+        $this->authorize('view', $recipient);
+
+        $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
+        ]);
+
+        try {
+            $session = $this->getActiveSession($request);
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            $response = $bridge->sendLocation(
+                $recipient->phone_e164,
+                $request->latitude,
+                $request->longitude
+            );
+
+            $message = Message::create([
+                'campaign_id' => null,
+                'recipient_id' => $recipient->id,
+                'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
+                'phone_e164' => $recipient->phone_e164,
+                'body_rendered' => "[Location: {$request->latitude}, {$request->longitude}]",
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('success', 'Location sent successfully.');
+
+        } catch (Exception $e) {
+            return redirect()->route('contacts.show', $recipient)
+                ->with('error', 'Failed to send location: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send contact card
+     */
+    public function sendContact(Request $request, Recipient $recipient): RedirectResponse
+    {
+        $this->authorize('view', $recipient);
+
+        $request->validate([
+            'contact_name' => 'required|string|max:255',
+            'contact_phone' => 'required|string|max:50',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
+        ]);
+
+        try {
+            $session = $this->getActiveSession($request);
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            $response = $bridge->sendContact(
+                $recipient->phone_e164,
+                $request->contact_name,
+                $request->contact_phone
+            );
+
+            $message = Message::create([
+                'campaign_id' => null,
+                'recipient_id' => $recipient->id,
+                'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
+                'phone_e164' => $recipient->phone_e164,
+                'body_rendered' => "[Contact: {$request->contact_name}]",
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('success', 'Contact sent successfully.');
+
+        } catch (Exception $e) {
+            return redirect()->route('contacts.show', $recipient)
+                ->with('error', 'Failed to send contact: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send poll
+     */
+    public function sendPoll(Request $request, Recipient $recipient): RedirectResponse
+    {
+        $this->authorize('view', $recipient);
+
+        $request->validate([
+            'question' => 'required|string|max:255',
+            'options' => 'required|array|min:2|max:12',
+            'options.*' => 'required|string|max:100',
+            'max_answer' => 'nullable|integer|min:1',
+            'wa_session_id' => 'nullable|exists:wa_sessions,id',
+        ]);
+
+        try {
+            $session = $this->getActiveSession($request);
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            $response = $bridge->sendPoll(
+                $recipient->phone_e164,
+                $request->question,
+                $request->options,
+                $request->max_answer ?? 1
+            );
+
+            $message = Message::create([
+                'campaign_id' => null,
+                'recipient_id' => $recipient->id,
+                'user_id' => $request->user()->id,
+                'wa_session_id' => $session->id,
+                'phone_e164' => $recipient->phone_e164,
+                'body_rendered' => "[Poll: {$request->question}]",
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+
+            return redirect()->route('contacts.show', $recipient)
+                ->with('success', 'Poll sent successfully.');
+
+        } catch (Exception $e) {
+            return redirect()->route('contacts.show', $recipient)
+                ->with('error', 'Failed to send poll: ' . $e->getMessage());
         }
     }
 
@@ -280,5 +532,62 @@ class ContactController extends Controller
 
         return redirect()->route('contacts.index')
             ->with('success', 'Contact deleted successfully.');
+    }
+
+    /**
+     * Get active WhatsApp session for user
+     */
+    private function getActiveSession(Request $request): WaSession
+    {
+        // If session ID provided, use that
+        if ($request->wa_session_id) {
+            $session = WaSession::where('id', $request->wa_session_id)
+                ->where('user_id', $request->user()->id)
+                ->where('status', 'connected')
+                ->firstOrFail();
+        } else {
+            // Otherwise use primary or first connected session
+            $session = WaSession::where('user_id', $request->user()->id)
+                ->where('status', 'connected')
+                ->orderBy('is_primary', 'desc')
+                ->firstOrFail();
+        }
+
+        if (!$session) {
+            throw new Exception('No active WhatsApp session found. Please connect a device first.');
+        }
+
+        return $session;
+    }
+
+    /**
+     * Track Facebook Contact event
+     */
+    private function trackFacebookContact(Request $request, Message $message, Recipient $recipient): void
+    {
+        try {
+            $userData = $this->facebookService->buildUserDataFromAuth();
+
+            $customData = [
+                'content_name' => 'Individual Message Sent',
+                'status' => 'completed',
+            ];
+
+            if ($recipient->first_name) {
+                $customData['content_category'] = 'Direct Message';
+            }
+
+            $this->facebookService->trackContact($userData, $customData);
+
+            Log::info('Facebook Contact event tracked', [
+                'user_id' => $request->user()->id,
+                'message_id' => $message->id,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to track Facebook Contact event', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

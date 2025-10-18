@@ -8,6 +8,8 @@ use App\Http\Controllers\FeatureRequestController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\WaSessionController;
+use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WhatsAppSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -15,31 +17,38 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-// Dashboard Route - No phone verification required (will show banner)
+// Dashboard Route
 Route::get('dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// WhatsApp Connection Routes - Require phone verification
-Route::middleware(['auth', 'verified.phone'])->prefix('w')->name('wa.')->group(function () {
+// WhatsApp Multi-Device routes
+Route::middleware(['auth'])->prefix('w')->name('wa.')->group(function () {
+    // Device management
     Route::get('/connect', [WaSessionController::class, 'index'])->name('connect');
-    Route::post('/session', [WaSessionController::class, 'store'])->name('session.store');
-    Route::post('/session/pairing', [WaSessionController::class, 'storePairing'])->name('session.pairing');
     Route::get('/session/status', [WaSessionController::class, 'status'])->name('session.status');
-    Route::post('/session/refresh', [WaSessionController::class, 'refresh'])->name('session.refresh');
-    Route::delete('/session', [WaSessionController::class, 'destroy'])->name('session.destroy');
 
-    // Callback endpoints for Node.js (no auth middleware, uses token verification)
-    Route::post('/session/credentials/store', [WaSessionController::class, 'storeCredentials'])
-        ->name('session.credentials.store')
-        ->withoutMiddleware(['auth', 'verified.phone']);
+    // Generate QR/Pairing
+    Route::post('/session/qr', [WaSessionController::class, 'generateQr'])->name('session.qr');
+    Route::post('/session/pairing', [WaSessionController::class, 'generatePairing'])->name('session.pairing');
 
-    Route::post('/session/credentials/load', [WaSessionController::class, 'loadCredentials'])
-        ->name('session.credentials.load')
-        ->withoutMiddleware(['auth', 'verified.phone']);
+    // Refresh QR
+    Route::post('/session/{deviceId}/refresh-qr', [WaSessionController::class, 'refreshQr'])->name('session.refresh-qr');
+
+    // Device actions
+    Route::post('/session/{deviceId}/set-primary', [WaSessionController::class, 'setPrimary'])->name('session.set-primary');
+    Route::delete('/session/{deviceId}', [WaSessionController::class, 'destroy'])->name('session.destroy');
+
+    Route::post('/session/{deviceId}/sync-contacts', [WaSessionController::class, 'syncContacts'])->name('wa.sync-contacts');
 });
 
-// Contacts Import Routes - Require phone verification
+// WhatsApp Settings
+Route::middleware(['auth'])->prefix('settings/whatsapp')->name('whatsapp.settings.')->group(function () {
+    Route::get('/', [WhatsAppSettingsController::class, 'index'])->name('index');
+    Route::post('/', [WhatsAppSettingsController::class, 'update'])->name('update');
+});
+
+// Contacts Import Routes
 Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('imports.')->group(function () {
     Route::get('/imports', [ImportController::class, 'index'])->name('index');
     Route::get('/imports/template', [ImportController::class, 'template'])->name('template');
@@ -48,17 +57,35 @@ Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('imports
     Route::delete('/imports/{import}', [ImportController::class, 'destroy'])->name('destroy');
 });
 
-// CRM Contact Routes - Require phone verification
+// CRM Contact Routes
 Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('contacts.')->group(function () {
     Route::get('/', [ContactController::class, 'index'])->name('index');
     Route::get('/create', [ContactController::class, 'create'])->name('create');
     Route::post('/', [ContactController::class, 'store'])->name('store');
     Route::get('/{recipient}', [ContactController::class, 'show'])->name('show');
+
+    // Text message
     Route::post('/{recipient}/send', [ContactController::class, 'sendMessage'])->name('send');
+
+    // Media messages
+    Route::post('/{recipient}/send-media', [ContactController::class, 'sendMedia'])->name('send.media');
+
+    // Link message
+    Route::post('/{recipient}/send-link', [ContactController::class, 'sendLink'])->name('send.link');
+
+    // Location message
+    Route::post('/{recipient}/send-location', [ContactController::class, 'sendLocation'])->name('send.location');
+
+    // Contact card
+    Route::post('/{recipient}/send-contact', [ContactController::class, 'sendContact'])->name('send.contact');
+
+    // Poll
+    Route::post('/{recipient}/send-poll', [ContactController::class, 'sendPoll'])->name('send.poll');
+
     Route::delete('/{recipient}', [ContactController::class, 'destroy'])->name('destroy');
 });
 
-// Campaign Routes - Require phone verification
+// Campaign Routes
 Route::middleware(['auth', 'verified.phone'])->prefix('campaigns')->name('campaigns.')->group(function () {
     Route::get('/', [CampaignController::class, 'index'])->name('index');
     Route::get('/create', [CampaignController::class, 'create'])->name('create');
@@ -70,7 +97,7 @@ Route::middleware(['auth', 'verified.phone'])->prefix('campaigns')->name('campai
     Route::delete('/{campaign}', [CampaignController::class, 'destroy'])->name('destroy');
 });
 
-// Feature Request Routes - No phone verification required
+// Feature Request Routes
 Route::middleware(['auth'])->prefix('feature-requests')->name('feature-requests.')->group(function () {
     Route::get('/', [FeatureRequestController::class, 'index'])->name('index');
     Route::get('/create', [FeatureRequestController::class, 'create'])->name('create');
@@ -78,8 +105,10 @@ Route::middleware(['auth'])->prefix('feature-requests')->name('feature-requests.
     Route::get('/{featureRequest}', [FeatureRequestController::class, 'show'])->name('show');
 });
 
+// Webhook Route (no auth middleware)
+Route::post('/webhook/whatsapp', [WebhookController::class, 'handle'])->name('webhook.whatsapp');
+
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
-
 
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');

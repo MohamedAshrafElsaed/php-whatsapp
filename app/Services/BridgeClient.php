@@ -9,171 +9,416 @@ class BridgeClient
 {
     private string $baseUrl;
     private string $token;
+    private string $deviceId;
 
-    public function __construct()
+    public function __construct(?string $baseUrl = null, ?string $deviceId = null)
     {
-        $this->baseUrl = rtrim(config('services.bridge.url'), '/');
+        $this->baseUrl = $baseUrl ?? rtrim(config('services.bridge.url'), '/');
         $this->token = config('services.bridge.token');
+        $this->deviceId = $deviceId ?? 'default';
     }
 
     /**
-     * Create or refresh WhatsApp session (queues connection request)
+     * APP ENDPOINTS
      */
-    public function createSession(int $userId, ?array $credentials = null): array
+
+    /**
+     * Get all connected devices
+     * GET /app/devices
+     */
+    public function getDevices(): array
     {
         try {
-            $payload = [
-                'user_id' => $userId,
-            ];
+            $response = Http::timeout(10)->get("{$this->baseUrl}/app/devices");
 
-            // Include credentials if provided (for database-backed auth)
-            if ($credentials !== null) {
-                $payload['credentials'] = $credentials;
+            if ($response->successful()) {
+                $data = $response->json();
+
+                Log::info('BridgeClient getDevices response', [
+                    'base_url' => $this->baseUrl,
+                    'response' => $data,
+                ]);
+
+                return [
+                    'success' => true,
+                    'data' => $data,
+                ];
             }
 
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/session/connect", $payload);
+            Log::warning('BridgeClient getDevices failed', [
+                'base_url' => $this->baseUrl,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return ['success' => false, 'data' => null];
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getDevices error', [
+                'base_url' => $this->baseUrl,
+                'error' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'data' => null];
+        }
+    }
+
+    /**
+     * Generate QR code for login
+     * GET /app/login
+     */
+    public function getQrCode(): array
+    {
+        try {
+            $response = Http::timeout(30)->get("{$this->baseUrl}/app/login");
 
             if ($response->failed()) {
-                throw new \Exception('Failed to create session: ' . $response->body());
+                throw new \Exception('Failed to get QR code: ' . $response->body());
             }
 
-            return $response->json();
+            $data = $response->json();
+
+            return [
+                'success' => isset($data['code']) && $data['code'] === 'SUCCESS',
+                'qr_link' => $data['results']['qr_link'] ?? null,
+                'qr_duration' => $data['results']['qr_duration'] ?? 30,
+            ];
         } catch (\Exception $e) {
-            Log::error('BridgeClient createSession error', [
+            Log::error('BridgeClient getQrCode error', [
+                'base_url' => $this->baseUrl,
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
             ]);
             throw $e;
         }
     }
 
     /**
-     * Create session with pairing code
+     * Generate pairing code
+     * GET /app/login-with-code?phone={phone}
      */
-    public function createSessionWithPairing(int $userId, string $phone): array
+    public function getPairingCode(string $phone): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/session/connect", [
-                'user_id' => $userId,
-                'pairing_phone' => $phone,
-            ]);
-
-            if ($response->failed()) {
-                throw new \Exception('Failed to create pairing session: ' . $response->body());
-            }
-
-            return $response->json();
-        } catch (\Exception $e) {
-            Log::error('BridgeClient createSessionWithPairing error', [
-                'error' => $e->getMessage(),
-                'user_id' => $userId,
+            $response = Http::timeout(30)->get("{$this->baseUrl}/app/login-with-code", [
                 'phone' => $phone,
             ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get pairing code: ' . $response->body());
+            }
+
+            $data = $response->json();
+
+            return [
+                'success' => isset($data['code']) && $data['code'] === 'SUCCESS',
+                'code' => $data['results']['code'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getPairingCode error', [
+                'base_url' => $this->baseUrl,
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }
 
     /**
-     * Get current session status
+     * Logout
+     * GET /app/logout
      */
-    public function getStatus(int $userId): array
+    public function logout(): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-            ])->get("{$this->baseUrl}/session/status/{$userId}");
+            $response = Http::timeout(10)->get("{$this->baseUrl}/app/logout");
 
             if ($response->failed()) {
-                throw new \Exception('Failed to get status: ' . $response->body());
+                throw new \Exception('Failed to logout: ' . $response->body());
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('BridgeClient getStatus error', [
+            Log::error('BridgeClient logout error', [
+                'base_url' => $this->baseUrl,
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
             ]);
             throw $e;
         }
     }
 
     /**
-     * Get QR code for session
+     * Reconnect
+     * GET /app/reconnect
      */
-    public function getQr(int $userId): array
+    public function reconnect(): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-            ])->get("{$this->baseUrl}/session/qr/{$userId}");
+            $response = Http::timeout(30)->get("{$this->baseUrl}/app/reconnect");
 
             if ($response->failed()) {
-                throw new \Exception('Failed to get QR: ' . $response->body());
+                throw new \Exception('Failed to reconnect: ' . $response->body());
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('BridgeClient getQr error', [
+            Log::error('BridgeClient reconnect error', [
+                'base_url' => $this->baseUrl,
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
             ]);
             throw $e;
         }
     }
 
     /**
-     * Disconnect session
+     * USER ENDPOINTS
      */
-    public function disconnect(int $userId): array
+
+    /**
+     * Get user info
+     * GET /user/info
+     */
+    public function getUserInfo(?string $phone = null): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/session/disconnect", [
-                'user_id' => $userId,
+            $url = "{$this->baseUrl}/user/info";
+            if ($phone) {
+                $url .= "?phone={$phone}";
+            }
+
+            $response = Http::timeout(10)->get($url);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get user info: ' . $response->body());
+            }
+
+            $data = $response->json();
+
+            return [
+                'success' => isset($data['code']) && $data['code'] === 'SUCCESS',
+                'data' => $data['results'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getUserInfo error', [
+                'error' => $e->getMessage(),
+            ]);
+            return ['success' => false, 'data' => null];
+        }
+    }
+
+    /**
+     * Update push name
+     * POST /user/pushname
+     */
+    public function updatePushname(string $pushName): array
+    {
+        try {
+            $response = Http::timeout(10)->post("{$this->baseUrl}/user/pushname", [
+                'push_name' => $pushName,
             ]);
 
             if ($response->failed()) {
-                throw new \Exception('Failed to disconnect: ' . $response->body());
+                throw new \Exception('Failed to update pushname: ' . $response->body());
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('BridgeClient disconnect error', [
+            Log::error('BridgeClient updatePushname error', [
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
             ]);
             throw $e;
         }
     }
 
     /**
-     * Send message via WhatsApp
+     * Get user's privacy settings
+     * GET /user/my/privacy
      */
-    public function sendMessage(int $userId, string $phone, string $message): array
+    public function getPrivacy(): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/session/send", [
-                'user_id' => $userId,
+            $response = Http::timeout(10)->get("{$this->baseUrl}/user/my/privacy");
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get privacy: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getPrivacy error', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Check if phone has WhatsApp
+     * GET /user/check?phone={phone}
+     */
+    public function checkPhone(string $phone): array
+    {
+        try {
+            $response = Http::timeout(10)->get("{$this->baseUrl}/user/check", [
+                'phone' => $phone,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to check phone: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient checkPhone error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get my contacts
+     * GET /user/my/contacts
+     */
+    public function getMyContacts(): array
+    {
+        try {
+            $response = Http::timeout(10)->get("{$this->baseUrl}/user/my/contacts");
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get contacts: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getMyContacts error', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get business profile
+     * GET /user/business-profile?phone={phone}
+     */
+    public function getBusinessProfile(string $phone): array
+    {
+        try {
+            $response = Http::timeout(10)->get("{$this->baseUrl}/user/business-profile", [
+                'phone' => $phone,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get business profile: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getBusinessProfile error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * CHAT MANAGEMENT ENDPOINTS
+     */
+
+    /**
+     * Get chats
+     * GET /chats?offset={offset}&limit={limit}&search={search}
+     */
+    public function getChats(int $offset = 0, int $limit = 10, string $search = ''): array
+    {
+        try {
+            $response = Http::timeout(10)->get("{$this->baseUrl}/chats", [
+                'offset' => $offset,
+                'limit' => $limit,
+                'search' => $search,
+                'has_media' => false,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get chats: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getChats error', [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get chat messages
+     * GET /chat/{chatId}/messages?offset={offset}&limit={limit}
+     */
+    public function getChatMessages(string $chatId, int $offset = 0, int $limit = 20): array
+    {
+        try {
+            $response = Http::timeout(10)->get("{$this->baseUrl}/chat/{$chatId}/messages", [
+                'offset' => $offset,
+                'limit' => $limit,
+                'search' => '',
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to get chat messages: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient getChatMessages error', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Pin chat
+     * POST /chat/{chatId}/pin
+     */
+    public function pinChat(string $chatId, bool $pinned): array
+    {
+        try {
+            $response = Http::timeout(10)->post("{$this->baseUrl}/chat/{$chatId}/pin", [
+                'pinned' => $pinned,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to pin chat: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient pinChat error', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * SEND MESSAGE ENDPOINTS
+     */
+
+    /**
+     * Send text message
+     * POST /send/message
+     */
+    public function sendMessage(string $phone, string $message, bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/send/message", [
                 'phone' => $phone,
                 'message' => $message,
-                'default_country' => 'EG',
+                'is_forwarded' => $isForwarded,
             ]);
 
             if ($response->failed()) {
@@ -183,40 +428,308 @@ class BridgeClient
             return $response->json();
         } catch (\Exception $e) {
             Log::error('BridgeClient sendMessage error', [
-                'error' => $e->getMessage(),
-                'user_id' => $userId,
                 'phone' => $phone,
+                'error' => $e->getMessage(),
             ]);
             throw $e;
         }
     }
 
     /**
-     * Refresh QR code (creates new session with force_new flag)
+     * Send image
+     * POST /send/image
      */
-    public function refreshQr(int $userId): array
+    public function sendImage(string $phone, $imageContents, string $fileName, string $caption = '', array $options = []): array
     {
         try {
-            $response = Http::withHeaders([
-                'X-BRIDGE-TOKEN' => $this->token,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/session/connect", [
-                'user_id' => $userId,
-                'force_new' => true
-            ]);
+            $response = Http::timeout(90)
+                ->attach('image', $imageContents, $fileName)
+                ->post("{$this->baseUrl}/send/image", [
+                    'phone' => $phone,
+                    'caption' => $caption,
+                    'view_once' => $options['view_once'] ?? false,
+                    'compress' => $options['compress'] ?? true,
+                    'is_forwarded' => $options['is_forwarded'] ?? false,
+                ]);
 
             if ($response->failed()) {
-                throw new \Exception('Failed to refresh QR: ' . $response->body());
+                throw new \Exception('Failed to send image: ' . $response->body());
             }
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('BridgeClient refreshQr error', [
+            Log::error('BridgeClient sendImage error', [
+                'phone' => $phone,
                 'error' => $e->getMessage(),
-                'user_id' => $userId,
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Send video
+     * POST /send/video
+     */
+    public function sendVideo(string $phone, $videoContents, string $fileName, string $caption = '', array $options = []): array
+    {
+        try {
+            $response = Http::timeout(120)
+                ->attach('video', $videoContents, $fileName)
+                ->post("{$this->baseUrl}/send/video", [
+                    'phone' => $phone,
+                    'caption' => $caption,
+                    'view_once' => $options['view_once'] ?? false,
+                    'compress' => $options['compress'] ?? true,
+                    'is_forwarded' => $options['is_forwarded'] ?? false,
+                ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send video: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendVideo error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send audio
+     * POST /send/audio
+     */
+    public function sendAudio(string $phone, $audioContents, string $fileName, bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(90)
+                ->attach('audio', $audioContents, $fileName)
+                ->post("{$this->baseUrl}/send/audio", [
+                    'phone' => $phone,
+                    'is_forwarded' => $isForwarded,
+                ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send audio: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendAudio error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+
+    /**
+     * Send file
+     * POST /send/file
+     */
+    public function sendFile(string $phone, $fileContents, string $fileName, string $caption = '', bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(90)
+                ->attach('file', $fileContents, $fileName)
+                ->post("{$this->baseUrl}/send/file", [
+                    'phone' => $phone,
+                    'caption' => $caption,
+                    'is_forwarded' => $isForwarded,
+                ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send file: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendFile error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send link
+     * POST /send/link
+     */
+    public function sendLink(string $phone, string $link, string $caption = '', bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/send/link", [
+                'phone' => $phone,
+                'link' => $link,
+                'caption' => $caption,
+                'is_forwarded' => $isForwarded,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send link: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendLink error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send location
+     * POST /send/location
+     */
+    public function sendLocation(string $phone, string $latitude, string $longitude, bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/send/location", [
+                'phone' => $phone,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'is_forwarded' => $isForwarded,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send location: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendLocation error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send contact
+     * POST /send/contact
+     */
+    public function sendContact(string $phone, string $contactName, string $contactPhone, bool $isForwarded = false): array
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/send/contact", [
+                'phone' => $phone,
+                'contact_name' => $contactName,
+                'contact_phone' => $contactPhone,
+                'is_forwarded' => $isForwarded,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send contact: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendContact error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send poll
+     * POST /send/poll
+     */
+    public function sendPoll(string $phone, string $question, array $options, int $maxAnswer = 1): array
+    {
+        try {
+            $response = Http::timeout(30)->post("{$this->baseUrl}/send/poll", [
+                'phone' => $phone,
+                'question' => $question,
+                'options' => $options,
+                'max_answer' => $maxAnswer,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send poll: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendPoll error', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send presence (available/unavailable)
+     * POST /send/presence
+     */
+    public function sendPresence(string $type): array
+    {
+        try {
+            $response = Http::timeout(10)->post("{$this->baseUrl}/send/presence", [
+                'type' => $type,
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send presence: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendPresence error', [
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Send chat presence (typing indicator)
+     * POST /send/chat-presence
+     */
+    public function sendChatPresence(string $phone, string $action): array
+    {
+        try {
+            $response = Http::timeout(10)->post("{$this->baseUrl}/send/chat-presence", [
+                'phone' => $phone,
+                'action' => $action, // 'start' or 'stop'
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Failed to send chat presence: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error('BridgeClient sendChatPresence error', [
+                'phone' => $phone,
+                'action' => $action,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * HELPER METHODS
+     */
+
+    public function getDeviceId(): string
+    {
+        return $this->deviceId;
+    }
+
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
     }
 }

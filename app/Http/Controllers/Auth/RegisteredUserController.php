@@ -91,6 +91,7 @@ class RegisteredUserController extends Controller
             'phone_verified' => true,
         ]);
 
+
         event(new Registered($user));
 
         // Log registration

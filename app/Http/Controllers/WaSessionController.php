@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncWhatsAppContacts;
 use App\Models\AuditLog;
 use App\Models\WaSession;
-use App\Services\BridgeClient;
-use App\Services\FacebookConversionsApiService;
+use App\Services\BridgeManager;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -17,139 +17,160 @@ use Log;
 class WaSessionController extends Controller
 {
     public function __construct(
-        private readonly BridgeClient         $bridge,
-        private readonly FacebookConversionsApiService $facebookService
+        private readonly BridgeManager $bridgeManager
     )
     {
     }
 
     /**
-     * Show WhatsApp connection page
+     * Show WhatsApp connection page with all user devices
      */
     public function index(Request $request): Response
     {
-        $session = $request->user()->waSession;
+        $sessions = WaSession::where('user_id', $request->user()->id)
+            ->orderBy('is_primary', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $maxDevices = $this->bridgeManager->getDeviceLimit($request->user()->id);
 
         return Inertia::render('whatsapp/Connect', [
-            'session' => $session,
+            'sessions' => $sessions,
+            'maxDevices' => $maxDevices,
         ]);
     }
 
     /**
-     * Get session status (for polling)
+     * Get status for all user's devices
      */
     public function status(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
-            $session = WaSession::where('user_id', $user->id)->first();
+            $sessions = WaSession::where('user_id', $user->id)->get();
 
-            if (!$session) {
-                return response()->json([
-                    'status' => 'not_found',
-                    'session' => null,
-                ]);
-            }
+            Log::info('Status check started', [
+                'user_id' => $user->id,
+                'session_count' => $sessions->count(),
+            ]);
 
-            // Get status from bridge
-            try {
-                $bridgeStatus = $this->bridge->getStatus($user->id);
+            $statusData = [];
 
-                $previousStatus = $session->status;
-                $newStatus = $previousStatus;
+            foreach ($sessions as $session) {
+                try {
+                    $bridge = $this->bridgeManager->getClientForSession($session);
 
-                // Map bridge response to session status
-                if (isset($bridgeStatus['ready']) && $bridgeStatus['ready'] === true) {
-                    $newStatus = 'connected';
-                } elseif (isset($bridgeStatus['qr_available']) && $bridgeStatus['qr_available'] === true) {
-                    $newStatus = 'pending';
-                } elseif (isset($bridgeStatus['pairing_code']) && $bridgeStatus['pairing_code']) {
-                    $newStatus = 'pending';
-                } elseif (!isset($bridgeStatus['exists']) || $bridgeStatus['exists'] === false) {
-                    $newStatus = 'disconnected';
-                }
+                    Log::info('Checking device status', [
+                        'device_id' => $session->device_id,
+                        'current_status' => $session->status,
+                        'bridge_url' => $session->getBridgeUrl(),
+                    ]);
 
-                // Update session if status changed
-                if ($previousStatus !== $newStatus) {
-                    $updateData = ['status' => $newStatus];
+                    // Check devices first (safe to call anytime)
+                    $devicesResponse = $bridge->getDevices();
+                    Log::info('Devices response received', [
+                        'device_id' => $session->device_id,
+                        'success' => $devicesResponse['success'],
+                        'full_response' => $devicesResponse,
+                    ]);
 
-                    if ($newStatus === 'connected') {
-                        $updateData['last_seen_at'] = now();
-                        $updateData['last_heartbeat_at'] = now();
+                    // FIXED: Check for devices in the correct nested structure
+                    $hasDevices = false;
+                    $deviceInfo = null;
 
-                        // Store WhatsApp profile info if available
-                        if (isset($bridgeStatus['owner'])) {
-                            $meta = $session->meta_json ?? [];
-                            $meta['profile'] = [
-                                'number' => $bridgeStatus['owner']['number'] ?? null,
-                                'pushName' => $bridgeStatus['owner']['pushName'] ?? null,
-                                'jid' => $bridgeStatus['owner']['jid'] ?? null,
-                            ];
-                            $updateData['meta_json'] = $meta;
-                        }
-
-                        // Track WhatsApp connection on Facebook
-                        try {
-                            $userData = $this->facebookService->buildUserDataFromUser($user);
-
-                            $customData = [
-                                'content_name' => 'WhatsApp Connected',
-                                'status' => 'activated',
-                            ];
-
-                            $this->facebookService->trackStartTrial($userData, $customData);
-
-                            Log::info('Facebook StartTrial event tracked for WhatsApp connection', [
-                                'user_id' => $user->id,
-                            ]);
-                        } catch (Exception $e) {
-                            Log::error('Failed to track Facebook StartTrial event', [
-                                'user_id' => $user->id,
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    } elseif ($newStatus === 'pending' && isset($bridgeStatus['qr_available']) && $bridgeStatus['qr_available']) {
-                        // Fetch fresh QR code
-                        try {
-                            $qrResponse = $this->bridge->getQr($user->id);
-                            $meta = $session->meta_json ?? [];
-                            $meta['qr_base64'] = $qrResponse['qr_image'] ?? null;
-                            $meta['method'] = 'qr';
-                            $updateData['meta_json'] = $meta;
-                            $updateData['expires_at'] = now()->addMinutes(5);
-                        } catch (Exception $e) {
-                            Log::warning('Failed to fetch QR during status polling', [
-                                'error' => $e->getMessage(),
-                                'user_id' => $user->id,
-                            ]);
-                        }
-                    } elseif ($newStatus === 'pending' && isset($bridgeStatus['pairing_code'])) {
-                        // Update pairing code in meta
-                        $meta = $session->meta_json ?? [];
-                        $meta['pairing_code'] = $bridgeStatus['pairing_code'];
-                        $meta['method'] = 'pairing';
-                        $updateData['meta_json'] = $meta;
-                        $updateData['expires_at'] = now()->addMinutes(5);
+                    if (
+                        $devicesResponse['success'] &&
+                        isset($devicesResponse['data']['results']) &&
+                        is_array($devicesResponse['data']['results']) &&
+                        count($devicesResponse['data']['results']) > 0
+                    ) {
+                        $hasDevices = true;
+                        $deviceInfo = $devicesResponse['data']['results'][0];
                     }
 
-                    $session->update($updateData);
+                    Log::info('Device check result', [
+                        'device_id' => $session->device_id,
+                        'has_devices' => $hasDevices,
+                        'device_info' => $deviceInfo,
+                        'current_status' => $session->status,
+                    ]);
 
-                    AuditLog::log("status_changed_{$newStatus}", 'WaSession', $session->id);
+                    // Important: Only mark as connected if we were PENDING and now have devices
+                    if ($hasDevices && $session->status === 'pending') {
+                        // Devices found = logged in
+                        $updateData = [
+                            'status' => 'connected',
+                            'last_seen_at' => now(),
+                            'last_heartbeat_at' => now(),
+                        ];
+
+                        if ($deviceInfo) {
+                            $updateData['meta_json'] = array_merge($session->meta_json ?? [], [
+                                'phone' => $deviceInfo['device'] ?? null,
+                                'name' => $deviceInfo['name'] ?? null,
+                                'device' => $deviceInfo['device'] ?? null,
+                                'platform' => 'WhatsApp',
+                            ]);
+                        }
+
+                        $session->update($updateData);
+
+                        SyncWhatsAppContacts::dispatch($session->fresh());
+
+
+                        Log::info('Session updated to connected', [
+                            'device_id' => $session->device_id,
+                            'meta' => $updateData['meta_json'] ?? null,
+                        ]);
+                    } elseif ($session->status === 'connected') {
+                        // Already connected - just update heartbeat
+                        $session->update([
+                            'last_heartbeat_at' => now(),
+                        ]);
+
+                        Log::info('Session heartbeat updated', [
+                            'device_id' => $session->device_id,
+                        ]);
+                    } elseif ($session->status === 'pending') {
+                        // Still pending
+                        if ($session->expires_at && $session->expires_at->isPast()) {
+                            // Mark as expired if QR/pairing code expired
+                            $session->update([
+                                'status' => 'expired',
+                                'last_heartbeat_at' => now(),
+                            ]);
+
+                            Log::info('Session marked as expired', [
+                                'device_id' => $session->device_id,
+                            ]);
+                        } else {
+                            Log::info('Session still pending', [
+                                'device_id' => $session->device_id,
+                                'expires_at' => $session->expires_at,
+                            ]);
+                        }
+                    }
+
+                    $statusData[] = $session->fresh();
+                } catch (\Exception $e) {
+                    Log::error("Status check failed for device {$session->device_id}", [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+
+                    // Keep the session as-is on error
+                    $statusData[] = $session;
                 }
-            } catch (Exception $e) {
-                Log::warning('Failed to get bridge status', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->id,
-                ]);
             }
 
             return response()->json([
                 'status' => 'success',
-                'session' => $session->fresh(),
+                'sessions' => $statusData,
             ]);
         } catch (Exception $e) {
             Log::error('Status check error', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => $request->user()->id,
             ]);
 
@@ -161,317 +182,341 @@ class WaSessionController extends Controller
     }
 
     /**
-     * Create new session with QR code (default method)
+     * Generate QR code for new device
      */
-    public function store(Request $request): RedirectResponse
+    public function generateQr(Request $request): JsonResponse
     {
         try {
+            $validated = $request->validate([
+                'device_label' => 'nullable|string|max:255',
+            ]);
+
             $user = $request->user();
-            $session = WaSession::where('user_id', $user->id)->first();
-            $credentials = null;
 
-            if ($session && $session->auth_credentials) {
-                $credentials = json_decode($session->auth_credentials, true);
+            // Check device limit
+            if (!$this->bridgeManager->canAddDevice($user->id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Maximum device limit reached (' . $this->bridgeManager->getDeviceLimit($user->id) . ' devices)',
+                ], 400);
             }
 
-            // Call Node.js bridge to create session
-            $response = $this->bridge->createSession($user->id, $credentials);
+            // CRITICAL: Clear user's dedicated bridge instance BEFORE generating QR
+            // This prevents false positives from old sessions
+            $this->bridgeManager->clearUserBridgeSessions($user->id);
 
-            // Wait for QR code to be generated
-            $qrResponse = null;
-            $maxAttempts = 20;
-            $attempt = 0;
+            // Wait for cleanup
+//            sleep(1);
 
-            while ($attempt < $maxAttempts && !$qrResponse) {
-                usleep(500000);
+            // Generate unique device ID
+            $deviceId = $this->bridgeManager->generateDeviceId($user->id);
 
-                try {
-                    $qrResponse = $this->bridge->getQr($user->id);
-                    break;
-                } catch (Exception $e) {
-                    $attempt++;
+            // Get user's dedicated bridge instance
+            $instance = $this->bridgeManager->getDedicatedInstanceForUser($user->id);
 
-                    if ($attempt >= $maxAttempts) {
-                        throw new Exception('QR code generation timeout. Please try again.');
-                    }
-                }
+            if (!$instance) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No available WhatsApp bridge servers. All bridges are in use.',
+                ], 503);
             }
 
-            // Create or update session with QR code
-            $session = WaSession::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'status' => 'pending',
-                    'meta_json' => [
-                        'qr_base64' => $qrResponse['qr_image'] ?? null,
-                        'method' => 'qr',
-                    ],
-                    'expires_at' => now()->addMinutes(5),
-                ]
-            );
+            // Create bridge client
+            $bridgeUrl = rtrim($instance['url'], '/') . ':' . $instance['port'];
+            $bridge = new \App\Services\BridgeClient($bridgeUrl, $deviceId);
+
+            // Get QR code
+            $response = $bridge->getQrCode();
+
+            if (!$response['success'] || !$response['qr_link']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to generate QR code',
+                ], 500);
+            }
+
+            $deviceCount = $this->bridgeManager->getDeviceCount($user->id);
+
+            // Create session
+            $session = WaSession::create([
+                'user_id' => $user->id,
+                'device_id' => $deviceId,
+                'device_label' => $validated['device_label'] ?? 'Device ' . ($deviceCount + 1),
+                'bridge_instance_url' => $instance['url'],
+                'bridge_instance_port' => $instance['port'],
+                'is_primary' => $deviceCount === 0,
+                'status' => 'pending',
+                'meta_json' => [
+                    'qr_link' => $response['qr_link'],
+                    'qr_duration' => $response['qr_duration'],
+                    'method' => 'qr',
+                ],
+                'expires_at' => now()->addSeconds($response['qr_duration'] ?? 30),
+            ]);
 
             AuditLog::log('qr_generated', 'WaSession', $session->id);
 
-            return redirect()->route('wa.connect')
-                ->with('success', 'QR code generated. Please scan it with your WhatsApp.');
-
-        } catch (Exception $e) {
-            Log::error('Failed to generate QR code', [
-                'error' => $e->getMessage(),
-                'user_id' => $request->user()->id,
+            Log::info('QR generated successfully', [
+                'user_id' => $user->id,
+                'device_id' => $deviceId,
+                'bridge' => $bridgeUrl,
             ]);
-
-            return redirect()->route('wa.connect')
-                ->with('error', 'Failed to generate QR code: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Refresh QR code
-     */
-    public function refresh(Request $request): RedirectResponse
-    {
-        try {
-            $user = $request->user();
-
-            // Call bridge to refresh QR (force_new = true)
-            $response = $this->bridge->refreshQr($user->id);
-
-            // Wait for new QR code to be generated
-            $qrResponse = null;
-            $maxAttempts = 20;
-            $attempt = 0;
-
-            while ($attempt < $maxAttempts && !$qrResponse) {
-                usleep(500000);
-
-                try {
-                    $qrResponse = $this->bridge->getQr($user->id);
-                    break;
-                } catch (Exception $e) {
-                    $attempt++;
-
-                    if ($attempt >= $maxAttempts) {
-                        throw new Exception('QR code generation timeout. Please try again.');
-                    }
-                }
-            }
-
-            $session = WaSession::where('user_id', $user->id)->first();
-            if ($session) {
-                $session->update([
-                    'status' => 'pending',
-                    'meta_json' => [
-                        'qr_base64' => $qrResponse['qr_image'] ?? null,
-                        'method' => 'qr',
-                    ],
-                    'expires_at' => now()->addMinutes(5),
-                ]);
-
-                AuditLog::log('qr_refreshed', 'WaSession', $session->id);
-            }
-
-            return redirect()->route('wa.connect')
-                ->with('success', 'QR code refreshed successfully.');
-
-        } catch (Exception $e) {
-            Log::error('Failed to refresh QR code', [
-                'error' => $e->getMessage(),
-                'user_id' => $request->user()->id,
-            ]);
-
-            return redirect()->route('wa.connect')
-                ->with('error', 'Failed to refresh QR code: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Disconnect session
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        try {
-            $user = $request->user();
-            $session = WaSession::where('user_id', $user->id)->first();
-
-            if (!$session) {
-                return redirect()->route('wa.connect')
-                    ->with('error', 'No active session found.');
-            }
-
-            // Call bridge to disconnect
-            try {
-                $this->bridge->disconnect($user->id);
-            } catch (Exception $e) {
-                Log::warning('Bridge disconnect failed, updating local session anyway', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->id,
-                ]);
-            }
-
-            // Update local session and clear credentials
-            $session->update([
-                'status' => 'disconnected',
-                'meta_json' => null,
-                'auth_credentials' => null,
-                'last_seen_at' => null,
-                'last_heartbeat_at' => null,
-            ]);
-
-            AuditLog::log('disconnected', 'WaSession', $session->id);
-
-            return redirect()->route('wa.connect')
-                ->with('success', 'WhatsApp disconnected successfully.');
-
-        } catch (Exception $e) {
-            Log::error('Disconnect error', [
-                'error' => $e->getMessage(),
-                'user_id' => $request->user()->id,
-            ]);
-
-            return redirect()->route('wa.connect')
-                ->with('error', 'Failed to disconnect: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Store credentials from Node.js (callback endpoint)
-     */
-    public function storeCredentials(Request $request): JsonResponse
-    {
-        try {
-            $token = $request->header('X-BRIDGE-TOKEN');
-            if ($token !== config('services.bridge.token')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized'
-                ], 403);
-            }
-
-            $validated = $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-                'credentials' => 'nullable|array',
-            ]);
-
-            $session = WaSession::where('user_id', $validated['user_id'])->first();
-
-            if (!$session) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Session not found'
-                ], 404);
-            }
-
-            $session->update([
-                'auth_credentials' => $validated['credentials'] ? json_encode($validated['credentials']) : null,
-            ]);
-
-            return response()->json(['success' => true]);
-
-        } catch (Exception $e) {
-            Log::error('Store credentials error', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Load credentials for Node.js (callback endpoint)
-     */
-    public function loadCredentials(Request $request): JsonResponse
-    {
-        try {
-            $token = $request->header('X-BRIDGE-TOKEN');
-            if ($token !== config('services.bridge.token')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized'
-                ], 403);
-            }
-
-            $validated = $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-            ]);
-
-            $session = WaSession::where('user_id', $validated['user_id'])->first();
-
-            if (!$session || !$session->auth_credentials) {
-                return response()->json([
-                    'success' => true,
-                    'credentials' => null
-                ]);
-            }
 
             return response()->json([
                 'success' => true,
-                'credentials' => json_decode($session->auth_credentials, true)
+                'qr_code' => $response['qr_link'],
+                'device_id' => $deviceId,
+                'session' => $session,
+                'expires_in' => $response['qr_duration'] ?? 30,
             ]);
-
         } catch (Exception $e) {
-            Log::error('Load credentials error', [
+            Log::error('Failed to generate QR code', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()->id,
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Create new session with Pairing Code (alternative method)
+     * Generate pairing code for new device
      */
-    public function storePairing(Request $request): RedirectResponse
+    public function generatePairing(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
                 'phone' => 'required|string|min:10|max:20',
+                'device_label' => 'nullable|string|max:255',
             ]);
 
             $user = $request->user();
 
-            // Call Node.js bridge to create session with pairing code
-            $response = $this->bridge->createSessionWithPairing($user->id, $validated['phone']);
-
-            $pairingCode = $response['pairing_code'] ?? null;
-
-            if (!$pairingCode) {
-                throw new Exception('Failed to generate pairing code');
+            // Check device limit
+            if (!$this->bridgeManager->canAddDevice($user->id)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Maximum device limit reached (' . $this->bridgeManager->getDeviceLimit($user->id) . ' devices)',
+                ], 400);
             }
 
-            // Create or update session with pairing info
-            $session = WaSession::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'status' => 'pending',
-                    'meta_json' => [
-                        'pairing_code' => $pairingCode,
-                        'pairing_phone' => $validated['phone'],
-                        'method' => 'pairing',
-                    ],
-                    'expires_at' => now()->addMinutes(5),
-                ]
-            );
+            // Generate unique device ID
+            $deviceId = $this->bridgeManager->generateDeviceId($user->id);
+
+            // Get available bridge instance
+            $bridge = $this->bridgeManager->createClientForNewSession($deviceId);
+
+            if (!$bridge) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No available WhatsApp bridge servers',
+                ], 503);
+            }
+
+            // Get pairing code
+            $response = $bridge->getPairingCode($validated['phone']);
+
+            // Get instance assignment
+            $instance = $this->bridgeManager->getLeastLoadedInstance();
+
+            $deviceCount = $this->bridgeManager->getDeviceCount($user->id);
+
+            // Create session
+            $session = WaSession::create([
+                'user_id' => $user->id,
+                'device_id' => $deviceId,
+                'device_label' => $validated['device_label'] ?? 'Device ' . ($deviceCount + 1),
+                'bridge_instance_url' => $instance['url'],
+                'bridge_instance_port' => $instance['port'],
+                'is_primary' => $deviceCount === 0,
+                'status' => 'pending',
+                'meta_json' => [
+                    'pairing_code' => $response['code'] ?? null,
+                    'pairing_phone' => $validated['phone'],
+                    'method' => 'pairing',
+                ],
+                'expires_at' => now()->addMinutes(5),
+            ]);
 
             AuditLog::log('pairing_code_generated', 'WaSession', $session->id);
 
-            return redirect()->route('wa.connect')
-                ->with('success', 'Pairing code generated: ' . $pairingCode . ' - Enter this code on your phone.');
-
+            return response()->json([
+                'success' => true,
+                'pairing_code' => $response['code'] ?? null,
+                'device_id' => $deviceId,
+                'session' => $session,
+            ]);
         } catch (Exception $e) {
             Log::error('Failed to generate pairing code', [
                 'error' => $e->getMessage(),
                 'user_id' => $request->user()->id,
             ]);
 
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Disconnect specific device
+     */
+    public function destroy(Request $request, string $deviceId): RedirectResponse
+    {
+        try {
+            $user = $request->user();
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->firstOrFail();
+
+            // Call bridge to disconnect
+            try {
+                $bridge = $this->bridgeManager->getClientForSession($session);
+                $bridge->logout();
+            } catch (Exception $e) {
+                Log::warning('Bridge disconnect failed', [
+                    'device_id' => $deviceId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Delete session
+            $session->delete();
+
+            AuditLog::log('device_disconnected', 'WaSession', $session->id);
+
             return redirect()->route('wa.connect')
-                ->with('error', 'Failed to generate pairing code: ' . $e->getMessage());
+                ->with('success', 'Device disconnected successfully.');
+        } catch (Exception $e) {
+            Log::error('Disconnect error', [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('wa.connect')
+                ->with('error', 'Failed to disconnect device.');
+        }
+    }
+
+    /**
+     * Set device as primary
+     */
+    public function setPrimary(Request $request, string $deviceId): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Remove primary flag from all devices
+            WaSession::where('user_id', $user->id)
+                ->update(['is_primary' => false]);
+
+            // Set new primary
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->firstOrFail();
+
+            $session->update(['is_primary' => true]);
+
+            AuditLog::log('primary_device_changed', 'WaSession', $session->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Primary device updated',
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Refresh expired QR code
+     */
+    public function refreshQr(Request $request, string $deviceId): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->where('status', 'pending')
+                ->firstOrFail();
+
+            $bridge = $this->bridgeManager->getClientForSession($session);
+            $response = $bridge->getQrCode();
+
+            if (!$response['success'] || !$response['qr_link']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to generate QR code',
+                ], 500);
+            }
+
+            // Update session with new QR
+            $session->update([
+                'meta_json' => array_merge($session->meta_json ?? [], [
+                    'qr_link' => $response['qr_link'],
+                    'qr_duration' => $response['qr_duration'],
+                ]),
+                'expires_at' => now()->addSeconds($response['qr_duration'] ?? 30),
+            ]);
+
+            AuditLog::log('qr_refreshed', 'WaSession', $session->id);
+
+            return response()->json([
+                'success' => true,
+                'qr_code' => $response['qr_link'],
+                'expires_in' => $response['qr_duration'] ?? 30,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to refresh QR code', [
+                'error' => $e->getMessage(),
+                'device_id' => $deviceId,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Manually sync contacts for a connected device
+     */
+    public function syncContacts(Request $request, string $deviceId): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->where('status', 'connected')
+                ->firstOrFail();
+
+            SyncWhatsAppContacts::dispatch($session);
+
+            AuditLog::log('contact_sync_requested', 'WaSession', $session->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Contact sync started',
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to sync contacts', [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 }

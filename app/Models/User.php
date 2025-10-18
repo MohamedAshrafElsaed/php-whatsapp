@@ -30,6 +30,9 @@ class User extends Authenticatable
         'country_code',
         'phone',
         'phone_verified',
+        'wa_auto_reply_enabled',
+        'wa_auto_reply_message',
+        'wa_auto_mark_read',
     ];
 
     /**
@@ -40,6 +43,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'wa_auto_reply_enabled' => 'boolean',
+        'wa_auto_mark_read' => 'boolean',
     ];
 
     /**
