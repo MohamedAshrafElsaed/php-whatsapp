@@ -86,15 +86,21 @@ Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('contact
 });
 
 // Campaign Routes
-Route::middleware(['auth', 'verified.phone'])->prefix('campaigns')->name('campaigns.')->group(function () {
-    Route::get('/', [CampaignController::class, 'index'])->name('index');
-    Route::get('/create', [CampaignController::class, 'create'])->name('create');
-    Route::post('/', [CampaignController::class, 'store'])->name('store');
-    Route::get('/{campaign}', [CampaignController::class, 'show'])->name('show');
-    Route::post('/{campaign}/start', [CampaignController::class, 'start'])->name('start');
-    Route::post('/{campaign}/pause', [CampaignController::class, 'pause'])->name('pause');
-    Route::post('/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('cancel');
-    Route::delete('/{campaign}', [CampaignController::class, 'destroy'])->name('destroy');
+
+// Campaign Management Routes
+Route::middleware(['auth'])->group(function () {
+    // Campaign CRUD
+    Route::get('/campaigns', [CampaignController::class, 'index'])->name('campaigns.index');
+    Route::get('/campaigns/create', [CampaignController::class, 'create'])->name('campaigns.create');
+    Route::post('/campaigns', [CampaignController::class, 'store'])->name('campaigns.store');
+    Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->name('campaigns.show');
+    Route::delete('/campaigns/{campaign}', [CampaignController::class, 'destroy'])->name('campaigns.destroy');
+
+    // Campaign Actions
+    Route::post('/campaigns/{campaign}/start', [CampaignController::class, 'start'])->name('campaigns.start');
+    Route::post('/campaigns/{campaign}/pause', [CampaignController::class, 'pause'])->name('campaigns.pause');
+    Route::post('/campaigns/{campaign}/resume', [CampaignController::class, 'resume'])->name('campaigns.resume');
+    Route::post('/campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('campaigns.cancel');
 });
 
 // Feature Request Routes

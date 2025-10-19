@@ -13,7 +13,7 @@ class Campaign extends Model
 
     protected $fillable = [
         'user_id',
-        'wa_session_id', // NEW: Links to specific WhatsApp device
+        'wa_session_id',
         'import_id',
         'name',
         'message_template',
@@ -38,27 +38,49 @@ class Campaign extends Model
         'finished_at' => 'datetime',
         'scheduled_at' => 'datetime',
         'completed_at' => 'datetime',
+        'sent_count' => 'integer',
+        'failed_count' => 'integer',
+        'total_recipients' => 'integer',
     ];
 
-    // Relationships
+    /**
+     * Get the user that owns the campaign
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Get the import associated with the campaign
+     */
     public function import(): BelongsTo
     {
         return $this->belongsTo(Import::class);
     }
 
+    /**
+     * Get the WhatsApp session (device) used for this campaign
+     */
     public function waSession(): BelongsTo
     {
-        return $this->belongsTo(WaSession::class);
+        return $this->belongsTo(WaSession::class, 'wa_session_id');
     }
 
+    /**
+     * Get all messages for this campaign
+     */
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
+    }
+
+    /**
+     * Get all recipients for this campaign (through import)
+     */
+    public function recipients(): HasMany
+    {
+        return $this->hasMany(Recipient::class, 'import_id', 'import_id');
     }
 
     // Scopes
@@ -72,6 +94,21 @@ class Campaign extends Model
         return $query->whereIn('status', ['pending', 'running', 'paused']);
     }
 
+    public function scopeRunning($query)
+    {
+        return $query->where('status', 'running');
+    }
+
+    public function scopePaused($query)
+    {
+        return $query->where('status', 'paused');
+    }
+
+    public function scopeFinished($query)
+    {
+        return $query->where('status', 'finished');
+    }
+
     // Helper Methods
     public function isRunning(): bool
     {
@@ -83,9 +120,25 @@ class Campaign extends Model
         return in_array($this->status, ['draft', 'pending']);
     }
 
+    public function isPaused(): bool
+    {
+        return $this->status === 'paused';
+    }
+
+    public function isFinished(): bool
+    {
+        return $this->status === 'finished';
+    }
+
+    public function isCanceled(): bool
+    {
+        return $this->status === 'canceled';
+    }
+
     public function canStart(): bool
     {
         return in_array($this->status, ['draft', 'pending', 'paused'])
+            && $this->wa_session_id
             && $this->waSession
             && $this->waSession->isConnected();
     }
@@ -98,6 +151,7 @@ class Campaign extends Model
     public function canResume(): bool
     {
         return $this->status === 'paused'
+            && $this->wa_session_id
             && $this->waSession
             && $this->waSession->isConnected();
     }
@@ -113,6 +167,63 @@ class Campaign extends Model
             return 0;
         }
 
+        $totalProcessed = $this->sent_count + $this->failed_count;
+        return round(($totalProcessed / $this->total_recipients) * 100, 2);
+    }
+
+    public function getSentPercentage(): float
+    {
+        if ($this->total_recipients == 0) {
+            return 0;
+        }
+
         return round(($this->sent_count / $this->total_recipients) * 100, 2);
+    }
+
+    public function getFailedPercentage(): float
+    {
+        if ($this->total_recipients == 0) {
+            return 0;
+        }
+
+        return round(($this->failed_count / $this->total_recipients) * 100, 2);
+    }
+
+    public function getRemainingCount(): int
+    {
+        return max(0, $this->total_recipients - $this->sent_count - $this->failed_count);
+    }
+
+    /**
+     * Get the throttling configuration with defaults
+     */
+    public function getThrottlingConfig(): array
+    {
+        return array_merge([
+            'messages_per_minute' => 15,
+            'delay_between_messages' => 4, // seconds
+            'batch_size' => 50,
+            'delay_between_batches' => 60, // seconds
+        ], $this->throttling_cfg_json ?? []);
+    }
+
+    /**
+     * Boot method to set default values
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($campaign) {
+            // Set default throttling if not provided
+            if (empty($campaign->throttling_cfg_json)) {
+                $campaign->throttling_cfg_json = [
+                    'messages_per_minute' => 15,
+                    'delay_between_messages' => 4,
+                    'batch_size' => 50,
+                    'delay_between_batches' => 60,
+                ];
+            }
+        });
     }
 }
