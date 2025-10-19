@@ -12,7 +12,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-
+    <meta name="google-site-verification" content="gWw1gPsW-JAVIUE4WKgOGYP1W1gF5nSg7Emx10mlYAg" />
     {{-- SEO Meta Tags --}}
     <meta name="description"
           content="{{ config('app.name') }} - Professional WhatsApp Bulk Messaging System. Send bulk messages, manage contacts, create campaigns with advanced features. {{ app()->getLocale() == 'ar' ? 'نظام إرسال رسائل واتساب جماعية احترافي. أرسل رسائل جماعية، وإدارة جهات الاتصال، وإنشاء حملات بميزات متقدمة.' : '' }}">
