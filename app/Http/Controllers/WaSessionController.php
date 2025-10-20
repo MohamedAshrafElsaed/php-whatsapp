@@ -58,45 +58,64 @@ class WaSessionController extends Controller
 
             foreach ($sessions as $session) {
                 try {
-                    $bridge = $this->bridgeManager->getClientForSession($session);
-
-                    Log::info('Checking device status', [
+                    Log::info('🔍 Checking session', [
                         'device_id' => $session->device_id,
                         'current_status' => $session->status,
                         'bridge_url' => $session->getBridgeUrl(),
                     ]);
 
+                    $bridge = $this->bridgeManager->getClientForSession($session);
+
                     // Check devices first (safe to call anytime)
                     $devicesResponse = $bridge->getDevices();
-                    Log::info('Devices response received', [
+
+                    Log::info('📡 Bridge response', [
                         'device_id' => $session->device_id,
-                        'success' => $devicesResponse['success'],
-                        'full_response' => $devicesResponse,
+                        'success' => $devicesResponse['success'] ?? false,
+                        'raw_response' => json_encode($devicesResponse),
                     ]);
 
-                    // FIXED: Check for devices in the correct nested structure
+                    // Check for devices in the correct nested structure
                     $hasDevices = false;
                     $deviceInfo = null;
 
                     if (
-                        $devicesResponse['success'] &&
+                        isset($devicesResponse['success']) &&
+                        $devicesResponse['success'] === true &&
                         isset($devicesResponse['data']['results']) &&
                         is_array($devicesResponse['data']['results']) &&
                         count($devicesResponse['data']['results']) > 0
                     ) {
                         $hasDevices = true;
                         $deviceInfo = $devicesResponse['data']['results'][0];
+
+                        Log::info('✅ DEVICES FOUND!', [
+                            'device_id' => $session->device_id,
+                            'device_info' => $deviceInfo,
+                        ]);
+                    } else {
+                        Log::info('❌ NO DEVICES FOUND', [
+                            'device_id' => $session->device_id,
+                            'response_structure' => [
+                                'has_success_key' => isset($devicesResponse['success']),
+                                'success_value' => $devicesResponse['success'] ?? null,
+                                'has_data_key' => isset($devicesResponse['data']),
+                                'has_results_key' => isset($devicesResponse['data']['results']),
+                                'results_is_array' => isset($devicesResponse['data']['results']) && is_array($devicesResponse['data']['results']),
+                                'results_count' => isset($devicesResponse['data']['results']) ? count($devicesResponse['data']['results']) : 0,
+                            ],
+                        ]);
                     }
 
-                    Log::info('Device check result', [
+                    Log::info('🔄 Current session status', [
                         'device_id' => $session->device_id,
+                        'status' => $session->status,
                         'has_devices' => $hasDevices,
-                        'device_info' => $deviceInfo,
-                        'current_status' => $session->status,
+                        'will_update' => $hasDevices && in_array($session->status, ['pending', 'disconnected', 'expired']),
                     ]);
 
-                    // Important: Only mark as connected if we were PENDING and now have devices
-                    if ($hasDevices && $session->status === 'pending') {
+                    // Update status based on device presence
+                    if ($hasDevices && in_array($session->status, ['pending', 'disconnected', 'expired'])) {
                         // Devices found = logged in
                         $updateData = [
                             'status' => 'connected',
@@ -113,24 +132,44 @@ class WaSessionController extends Controller
                             ]);
                         }
 
+                        Log::info('💾 UPDATING SESSION TO CONNECTED', [
+                            'device_id' => $session->device_id,
+                            'old_status' => $session->status,
+                            'new_status' => 'connected',
+                            'update_data' => $updateData,
+                        ]);
+
                         $session->update($updateData);
 
+                        // Dispatch contact sync
                         SyncWhatsAppContacts::dispatch($session->fresh());
 
-
-                        Log::info('Session updated to connected', [
+                        Log::info('✅ SESSION UPDATED SUCCESSFULLY', [
                             'device_id' => $session->device_id,
-                            'meta' => $updateData['meta_json'] ?? null,
+                            'new_status' => $session->fresh()->status,
                         ]);
-                    } elseif ($session->status === 'connected') {
-                        // Already connected - just update heartbeat
+
+                    } elseif ($session->status === 'connected' && $hasDevices) {
+                        // Already connected and still has devices - just update heartbeat
                         $session->update([
                             'last_heartbeat_at' => now(),
                         ]);
 
-                        Log::info('Session heartbeat updated', [
+                        Log::info('💓 Heartbeat updated', [
                             'device_id' => $session->device_id,
                         ]);
+
+                    } elseif ($session->status === 'connected' && !$hasDevices) {
+                        // Was connected but no devices found = disconnected
+                        $session->update([
+                            'status' => 'disconnected',
+                            'last_heartbeat_at' => now(),
+                        ]);
+
+                        Log::info('🔌 Session disconnected (no devices)', [
+                            'device_id' => $session->device_id,
+                        ]);
+
                     } elseif ($session->status === 'pending') {
                         // Still pending
                         if ($session->expires_at && $session->expires_at->isPast()) {
@@ -140,20 +179,16 @@ class WaSessionController extends Controller
                                 'last_heartbeat_at' => now(),
                             ]);
 
-                            Log::info('Session marked as expired', [
+                            Log::info('⏰ Session expired', [
                                 'device_id' => $session->device_id,
-                            ]);
-                        } else {
-                            Log::info('Session still pending', [
-                                'device_id' => $session->device_id,
-                                'expires_at' => $session->expires_at,
                             ]);
                         }
                     }
 
                     $statusData[] = $session->fresh();
+
                 } catch (\Exception $e) {
-                    Log::error("Status check failed for device {$session->device_id}", [
+                    Log::error("❌ Status check failed for device {$session->device_id}", [
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
                     ]);
@@ -167,8 +202,9 @@ class WaSessionController extends Controller
                 'status' => 'success',
                 'sessions' => $statusData,
             ]);
+
         } catch (Exception $e) {
-            Log::error('Status check error', [
+            Log::error('❌ Status check error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => $request->user()->id,
@@ -219,6 +255,7 @@ class WaSessionController extends Controller
             }
 
             // ✅ FIXED: Use bridge_url directly from instance
+//            $bridge = new \App\Services\BridgeClient('http://localhost:3001', $deviceId);
             $bridge = new \App\Services\BridgeClient($instance['bridge_url'], $deviceId);
 
             // Get QR code
@@ -271,6 +308,123 @@ class WaSessionController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => $request->user()->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // In WaSessionController.php - Add these new methods
+
+    /**
+     * Reconnect an expired/disconnected device
+     */
+    public function reconnect(Request $request, string $deviceId): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'method' => 'required|in:qr,pairing',
+                'phone' => 'required_if:method,pairing|string|min:10|max:20',
+            ]);
+
+            $user = $request->user();
+
+            // Find existing session
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->firstOrFail();
+
+            // Check if session can be reconnected
+            if (!$session->canReconnect()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'This device cannot be reconnected. Current status: ' . $session->status,
+                ], 400);
+            }
+
+            // Clean up old bridge session first
+            try {
+                $bridge = $this->bridgeManager->getClientForSession($session);
+                $bridge->logout();
+
+                Log::info('Cleaned up old bridge session before reconnection', [
+                    'device_id' => $deviceId,
+                    'old_status' => $session->status,
+                ]);
+            } catch (Exception $e) {
+                Log::warning('Failed to cleanup old session, continuing anyway', [
+                    'device_id' => $deviceId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Prepare session for reconnection
+            $session->prepareForReconnection();
+
+            // Get bridge client for this session (reuse same instance)
+            $bridge = $this->bridgeManager->getClientForSession($session);
+
+            // Generate new QR or pairing based on method
+            if ($validated['method'] === 'qr') {
+                $response = $bridge->getQrCode();
+
+                if (!$response['success'] || !$response['qr_link']) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Failed to generate QR code',
+                    ], 500);
+                }
+
+                $session->update([
+                    'meta_json' => array_merge($session->meta_json ?? [], [
+                        'qr_link' => $response['qr_link'],
+                        'qr_duration' => $response['qr_duration'],
+                        'method' => 'qr',
+                    ]),
+                    'expires_at' => now()->addSeconds($response['qr_duration'] ?? 30),
+                ]);
+
+                AuditLog::log('session_reconnect_qr', 'WaSession', $session->id);
+
+                return response()->json([
+                    'success' => true,
+                    'method' => 'qr',
+                    'qr_code' => $response['qr_link'],
+                    'expires_in' => $response['qr_duration'] ?? 30,
+                    'session' => $session->fresh(),
+                ]);
+
+            } else {
+                // Pairing method
+                $response = $bridge->getPairingCode($validated['phone']);
+
+                $session->update([
+                    'meta_json' => array_merge($session->meta_json ?? [], [
+                        'pairing_code' => $response['code'] ?? null,
+                        'pairing_phone' => $validated['phone'],
+                        'method' => 'pairing',
+                    ]),
+                    'expires_at' => now()->addMinutes(5),
+                ]);
+
+                AuditLog::log('session_reconnect_pairing', 'WaSession', $session->id);
+
+                return response()->json([
+                    'success' => true,
+                    'method' => 'pairing',
+                    'pairing_code' => $response['code'] ?? null,
+                    'session' => $session->fresh(),
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('Failed to reconnect device', [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
@@ -360,9 +514,8 @@ class WaSessionController extends Controller
         }
     }
 
-    /**
-     * Disconnect specific device
-     */
+    // In WaSessionController.php - Update the destroy method
+
     public function destroy(Request $request, string $deviceId): RedirectResponse
     {
         try {
@@ -382,13 +535,16 @@ class WaSessionController extends Controller
                 ]);
             }
 
-            // Delete session
-            $session->delete();
+            // Mark as disconnected instead of deleting (allows reconnection)
+            $session->update([
+                'status' => 'disconnected',
+                'last_seen_at' => now(),
+            ]);
 
             AuditLog::log('device_disconnected', 'WaSession', $session->id);
 
             return redirect()->route('wa.connect')
-                ->with('success', 'Device disconnected successfully.');
+                ->with('success', 'Device disconnected successfully. You can reconnect it later.');
         } catch (Exception $e) {
             Log::error('Disconnect error', [
                 'device_id' => $deviceId,
@@ -397,6 +553,48 @@ class WaSessionController extends Controller
 
             return redirect()->route('wa.connect')
                 ->with('error', 'Failed to disconnect device.');
+        }
+    }
+
+    // In WaSessionController.php - Add this new method
+
+    /**
+     * Permanently delete a device session
+     */
+    public function forceDelete(Request $request, string $deviceId): RedirectResponse
+    {
+        try {
+            $user = $request->user();
+            $session = WaSession::where('user_id', $user->id)
+                ->where('device_id', $deviceId)
+                ->firstOrFail();
+
+            // Call bridge to disconnect
+            try {
+                $bridge = $this->bridgeManager->getClientForSession($session);
+                $bridge->logout();
+            } catch (Exception $e) {
+                Log::warning('Bridge disconnect failed during deletion', [
+                    'device_id' => $deviceId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Permanently delete
+            $session->delete();
+
+            AuditLog::log('device_permanently_deleted', 'WaSession', $session->id);
+
+            return redirect()->route('wa.connect')
+                ->with('success', 'Device removed permanently.');
+        } catch (Exception $e) {
+            Log::error('Force delete error', [
+                'device_id' => $deviceId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->route('wa.connect')
+                ->with('error', 'Failed to delete device.');
         }
     }
 
@@ -440,9 +638,11 @@ class WaSessionController extends Controller
     {
         try {
             $user = $request->user();
+
+            // ✅ FIXED: Allow refresh for both pending AND expired sessions
             $session = WaSession::where('user_id', $user->id)
                 ->where('device_id', $deviceId)
-                ->where('status', 'pending')
+                ->whereIn('status', ['pending', 'expired'])
                 ->firstOrFail();
 
             $bridge = $this->bridgeManager->getClientForSession($session);
@@ -455,8 +655,9 @@ class WaSessionController extends Controller
                 ], 500);
             }
 
-            // Update session with new QR
+            // ✅ FIXED: Update status back to pending when refreshing
             $session->update([
+                'status' => 'pending',
                 'meta_json' => array_merge($session->meta_json ?? [], [
                     'qr_link' => $response['qr_link'],
                     'qr_duration' => $response['qr_duration'],

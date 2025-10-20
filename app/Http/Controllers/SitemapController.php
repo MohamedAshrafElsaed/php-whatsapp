@@ -2,55 +2,47 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Response;
+use Illuminate\Support\Facades\URL;
 
 class SitemapController extends Controller
 {
-    /**
-     * Generate XML sitemap
-     */
-    public function index(): Response
+    public function index()
     {
-        $baseUrl = rtrim(config('app.url'), '/');
-        $now = now()->toIso8601String();
+        $sitemap = '<?xml version="1.0" encoding="UTF-8"?>';
+        $sitemap .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $sitemap .= 'xmlns:xhtml="http://www.w3.org/1999/xhtml">';
 
-        $urls = [
-            [
-                'loc' => $baseUrl,
-                'lastmod' => $now,
-                'changefreq' => 'daily',
-                'priority' => '1.0',
-            ],
-            [
-                'loc' => $baseUrl . '/login',
-                'lastmod' => $now,
-                'changefreq' => 'monthly',
-                'priority' => '0.8',
-            ],
-            [
-                'loc' => $baseUrl . '/register',
-                'lastmod' => $now,
-                'changefreq' => 'monthly',
-                'priority' => '0.8',
-            ],
+        // Define pages with their priorities and change frequencies
+        $pages = [
+            ['url' => '/', 'priority' => '1.0', 'changefreq' => 'daily'],
+            ['url' => '/login', 'priority' => '0.8', 'changefreq' => 'monthly'],
+            ['url' => '/register', 'priority' => '0.8', 'changefreq' => 'monthly'],
         ];
 
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        $locales = ['ar', 'en'];
 
-        foreach ($urls as $url) {
-            $xml .= '  <url>' . "\n";
-            $xml .= '    <loc>' . htmlspecialchars($url['loc'], ENT_XML1, 'UTF-8') . '</loc>' . "\n";
-            $xml .= '    <lastmod>' . $url['lastmod'] . '</lastmod>' . "\n";
-            $xml .= '    <changefreq>' . $url['changefreq'] . '</changefreq>' . "\n";
-            $xml .= '    <priority>' . $url['priority'] . '</priority>' . "\n";
-            $xml .= '  </url>' . "\n";
+        foreach ($pages as $page) {
+            foreach ($locales as $locale) {
+                $url = URL::to($page['url'] . '?lang=' . $locale);
+
+                $sitemap .= '<url>';
+                $sitemap .= '<loc>' . htmlspecialchars($url) . '</loc>';
+
+                // Add alternate language links
+                foreach ($locales as $altLocale) {
+                    $altUrl = URL::to($page['url'] . '?lang=' . $altLocale);
+                    $sitemap .= '<xhtml:link rel="alternate" hreflang="' . $altLocale . '" href="' . htmlspecialchars($altUrl) . '" />';
+                }
+
+                $sitemap .= '<lastmod>' . date('Y-m-d') . '</lastmod>';
+                $sitemap .= '<changefreq>' . $page['changefreq'] . '</changefreq>';
+                $sitemap .= '<priority>' . $page['priority'] . '</priority>';
+                $sitemap .= '</url>';
+            }
         }
 
-        $xml .= '</urlset>';
+        $sitemap .= '</urlset>';
 
-        return response($xml, 200)
-            ->header('Content-Type', 'application/xml; charset=UTF-8')
-            ->header('Cache-Control', 'public, max-age=3600');
+        return response($sitemap, 200)->header('Content-Type', 'application/xml');
     }
 }

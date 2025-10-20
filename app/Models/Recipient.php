@@ -67,4 +67,13 @@ class Recipient extends Model
                 ->orWhere('email', 'like', "%{$search}%");
         });
     }
+
+    /**
+     * Get all segments this recipient belongs to
+     */
+    public function segments(): BelongsToMany
+    {
+        return $this->belongsToMany(Segment::class, 'recipient_segment')
+            ->withTimestamps();
+    }
 }

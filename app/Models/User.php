@@ -151,4 +151,12 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * @return HasMany
+     */
+    public function segments(): HasMany
+    {
+        return $this->hasMany(Segment::class);
+    }
 }

@@ -70,6 +70,8 @@ class WaSession extends Model
      */
     public function getBridgeUrl(): string
     {
+//        return 'http://localhost:3001';
+
         if ($this->bridge_instance_url && $this->bridge_instance_port) {
             return rtrim($this->bridge_instance_url, '/') . '/port/' . $this->bridge_instance_port;
         }
@@ -119,5 +121,24 @@ class WaSession extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
+    }
+
+    public function canReconnect(): bool
+    {
+        return in_array($this->status, ['pending', 'expired', 'disconnected', 'failed']);
+    }
+
+    public function prepareForReconnection(): void
+    {
+        $this->update([
+            'status' => 'pending',
+            'expires_at' => null,
+            'last_seen_at' => null,
+            'last_heartbeat_at' => null,
+            'meta_json' => array_merge($this->meta_json ?? [], [
+                'reconnection_attempt' => ($this->meta_json['reconnection_attempt'] ?? 0) + 1,
+                'last_reconnection_at' => now()->toISOString(),
+            ]),
+        ]);
     }
 }

@@ -36,17 +36,29 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
-
-        return [
-            ...parent::share($request),
-            'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
+        return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user(),
             ],
-            'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-        ];
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
+            // Share current locale
+            'locale' => app()->getLocale(),
+
+            // Share translations
+            'translations' => function () {
+                $locale = app()->getLocale();
+                $translationFile = lang_path("{$locale}.json");
+
+                if (file_exists($translationFile)) {
+                    return json_decode(file_get_contents($translationFile), true);
+                }
+
+                return [];
+            },
+        ]);
     }
 
     public function handle(Request $request, $next)

@@ -12,25 +12,23 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SendCampaignMessageJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 1; // Don't retry to avoid duplicate sends
-    public int $timeout = 30;
+    public int $timeout = 120; // Increased for media uploads
 
-    // Store only IDs to avoid serialization issues
-    public int $campaignId;
-    public int $recipientId;
+    public int $messageId;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(int $campaignId, int $recipientId)
+    public function __construct(int $messageId)
     {
-        $this->campaignId = $campaignId;
-        $this->recipientId = $recipientId;
+        $this->messageId = $messageId;
     }
 
     /**
@@ -38,100 +36,92 @@ class SendCampaignMessageJob implements ShouldQueue
      */
     public function handle(BridgeManager $bridgeManager): void
     {
-        try {
-            // Load fresh models from database
-            $campaign = Campaign::find($this->campaignId);
-            $recipient = Recipient::find($this->recipientId);
+        $message = Message::find($this->messageId);
 
-            if (!$campaign) {
-                Log::warning('Campaign not found', ['campaign_id' => $this->campaignId]);
-                return;
-            }
+        if (!$message) {
+            Log::error('Message not found', ['message_id' => $this->messageId]);
+            return;
+        }
 
-            if (!$recipient) {
-                Log::warning('Recipient not found', ['recipient_id' => $this->recipientId]);
-                return;
-            }
+        $campaign = $message->campaign;
 
-            // Check if campaign is still running
-            if (!$campaign->isRunning()) {
-                Log::info('Campaign not running, skipping message', [
-                    'campaign_id' => $campaign->id,
-                    'status' => $campaign->status,
-                    'recipient_id' => $recipient->id,
-                ]);
-                return;
-            }
-
-            // Check if recipient is valid
-            if (!$recipient->is_valid) {
-                $this->createFailedMessage($campaign, $recipient, 'INVALID_RECIPIENT', 'Recipient phone number is invalid');
-                return;
-            }
-
-            // Check if WhatsApp session exists and is connected
-            if (!$campaign->wa_session_id) {
-                Log::error('Campaign has no WhatsApp session assigned', [
-                    'campaign_id' => $campaign->id,
-                ]);
-                $campaign->update(['status' => 'paused']);
-                $this->createFailedMessage($campaign, $recipient, 'NO_SESSION', 'No WhatsApp device assigned to campaign');
-                return;
-            }
-
-            $waSession = $campaign->waSession;
-            if (!$waSession) {
-                Log::error('WhatsApp session not found', [
-                    'campaign_id' => $campaign->id,
-                    'wa_session_id' => $campaign->wa_session_id,
-                ]);
-                $campaign->update(['status' => 'paused']);
-                $this->createFailedMessage($campaign, $recipient, 'SESSION_NOT_FOUND', 'WhatsApp device not found');
-                return;
-            }
-
-            if (!$waSession->isConnected()) {
-                Log::warning('WhatsApp session not connected, pausing campaign', [
-                    'campaign_id' => $campaign->id,
-                    'session_status' => $waSession->status,
-                ]);
-                $campaign->update(['status' => 'paused']);
-                $this->createFailedMessage($campaign, $recipient, 'SESSION_DISCONNECTED', 'WhatsApp device disconnected');
-                return;
-            }
-
-            // Render message body with variable replacement
-            $body = $this->renderMessageBody($campaign->message_template, $recipient);
-
-            // Create message record
-            $message = Message::create([
-                'campaign_id' => $campaign->id,
-                'recipient_id' => $recipient->id,
-                'user_id' => $campaign->user_id,
-                'wa_session_id' => $waSession->id,
-                'phone_e164' => $recipient->phone_e164,
-                'body_template' => $campaign->message_template,
-                'body_rendered' => $body,
-                'status' => 'queued',
+        if (!$campaign) {
+            Log::error('Campaign not found for message', ['message_id' => $this->messageId]);
+            $message->update([
+                'status' => 'failed',
+                'error_code' => 'CAMPAIGN_NOT_FOUND',
+                'error_message' => 'Campaign not found',
             ]);
+            return;
+        }
 
-            // Get bridge client for the campaign's session
+        // Check campaign status
+        if (!in_array($campaign->status, ['running'])) {
+            Log::info('Campaign not running, skipping message', [
+                'message_id' => $this->messageId,
+                'campaign_status' => $campaign->status,
+            ]);
+            return;
+        }
+
+        $waSession = $campaign->waSession;
+
+        if (!$waSession || !$waSession->isConnected()) {
+            Log::error('WhatsApp session not connected', [
+                'message_id' => $this->messageId,
+                'campaign_id' => $campaign->id,
+            ]);
+            $message->update([
+                'status' => 'failed',
+                'error_code' => 'SESSION_DISCONNECTED',
+                'error_message' => 'WhatsApp session is not connected',
+            ]);
+            $campaign->increment('failed_count');
+            return;
+        }
+
+        try {
             $bridge = $bridgeManager->getClientForSession($waSession);
 
             Log::info('Sending campaign message', [
+                'message_id' => $this->messageId,
                 'campaign_id' => $campaign->id,
-                'message_id' => $message->id,
-                'recipient_id' => $recipient->id,
-                'phone' => $recipient->phone_e164,
-                'device' => $waSession->device_label,
-                'bridge_url' => $waSession->getBridgeUrl(),
+                'message_type' => $campaign->message_type,
+                'phone' => $message->phone_e164,
             ]);
 
-            // Send message via WhatsApp bridge
-            $response = $bridge->sendMessage(
-                $recipient->phone_e164,
-                $body
-            );
+            // Send based on message type
+            switch ($campaign->message_type) {
+                case 'text':
+                    $this->sendTextMessage($bridge, $message, $campaign);
+                    break;
+
+                case 'image':
+                case 'video':
+                case 'audio':
+                case 'file':
+                    $this->sendMediaMessage($bridge, $message, $campaign);
+                    break;
+
+                case 'link':
+                    $this->sendLinkMessage($bridge, $message, $campaign);
+                    break;
+
+                case 'location':
+                    $this->sendLocationMessage($bridge, $message, $campaign);
+                    break;
+
+                case 'contact':
+                    $this->sendContactMessage($bridge, $message, $campaign);
+                    break;
+
+                case 'poll':
+                    $this->sendPollMessage($bridge, $message, $campaign);
+                    break;
+
+                default:
+                    throw new \Exception('Unsupported message type: ' . $campaign->message_type);
+            }
 
             // Mark as sent
             $message->update([
@@ -139,121 +129,159 @@ class SendCampaignMessageJob implements ShouldQueue
                 'sent_at' => now(),
             ]);
 
-            // Update campaign counters
             $campaign->increment('sent_count');
 
             Log::info('Campaign message sent successfully', [
+                'message_id' => $this->messageId,
                 'campaign_id' => $campaign->id,
-                'message_id' => $message->id,
-                'recipient_id' => $recipient->id,
-                'phone' => $recipient->phone_e164,
+                'message_type' => $campaign->message_type,
             ]);
-
-            // Check if campaign is finished
-            $this->checkCampaignCompletion($campaign);
 
         } catch (\Exception $e) {
             Log::error('Failed to send campaign message', [
-                'campaign_id' => $this->campaignId,
-                'recipient_id' => $this->recipientId,
+                'message_id' => $this->messageId,
+                'campaign_id' => $campaign->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Try to create failed message record
-            try {
-                $campaign = Campaign::find($this->campaignId);
-                $recipient = Recipient::find($this->recipientId);
-
-                if ($campaign && $recipient) {
-                    $this->createFailedMessage($campaign, $recipient, 'SEND_ERROR', $e->getMessage());
-                }
-            } catch (\Exception $innerException) {
-                Log::error('Failed to create failed message record', [
-                    'error' => $innerException->getMessage(),
-                ]);
-            }
-
-            throw $e; // Re-throw to mark job as failed
-        }
-    }
-
-    /**
-     * Render message body by replacing variables
-     */
-    private function renderMessageBody(string $template, Recipient $recipient): string
-    {
-        $body = $template;
-
-        // Replace basic fields
-        $replacements = [
-            '{{first_name}}' => $recipient->first_name ?? '',
-            '{{last_name}}' => $recipient->last_name ?? '',
-            '{{email}}' => $recipient->email ?? '',
-            '{{phone}}' => $recipient->phone_e164 ?? '',
-            '{{phone_raw}}' => $recipient->phone_raw ?? '',
-        ];
-
-        foreach ($replacements as $placeholder => $value) {
-            $body = str_replace($placeholder, $value, $body);
-        }
-
-        // Replace extra_json fields
-        if ($recipient->extra_json && is_array($recipient->extra_json)) {
-            foreach ($recipient->extra_json as $key => $value) {
-                $placeholder = '{{' . $key . '}}';
-                $body = str_replace($placeholder, (string)$value, $body);
-            }
-        }
-
-        // Clean up any unreplaced variables
-        $body = preg_replace('/\{\{[a-zA-Z0-9_]+\}\}/', '', $body);
-
-        return trim($body);
-    }
-
-    /**
-     * Create a failed message record
-     */
-    private function createFailedMessage(Campaign $campaign, Recipient $recipient, string $errorCode, string $errorMessage): void
-    {
-        try {
-            $body = $this->renderMessageBody($campaign->message_template, $recipient);
-
-            Message::create([
-                'campaign_id' => $campaign->id,
-                'recipient_id' => $recipient->id,
-                'user_id' => $campaign->user_id,
-                'wa_session_id' => $campaign->wa_session_id,
-                'phone_e164' => $recipient->phone_e164,
-                'body_template' => $campaign->message_template,
-                'body_rendered' => $body,
+            $message->update([
                 'status' => 'failed',
-                'error_code' => $errorCode,
-                'error_message' => substr($errorMessage, 0, 500),
+                'error_code' => 'SEND_ERROR',
+                'error_message' => substr($e->getMessage(), 0, 500),
             ]);
 
             $campaign->increment('failed_count');
-        } catch (\Exception $e) {
-            Log::error('Failed to create failed message record', [
-                'campaign_id' => $campaign->id,
-                'recipient_id' => $recipient->id,
-                'error' => $e->getMessage(),
-            ]);
+        }
+
+        // Check if campaign is complete
+        $this->checkCampaignCompletion($campaign);
+    }
+
+    /**
+     * Send text message
+     */
+    private function sendTextMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        $bridge->sendMessage(
+            $message->phone_e164,
+            $message->body_rendered
+        );
+    }
+
+    /**
+     * Send media message (image, video, audio, file)
+     */
+    private function sendMediaMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        if (!$campaign->media_path || !Storage::disk('public')->exists($campaign->media_path)) {
+            throw new \Exception('Media file not found');
+        }
+
+        $fileContents = Storage::disk('public')->get($campaign->media_path);
+        $fileName = $campaign->media_filename ?? 'file';
+
+        // Use per-recipient rendered caption if available (stored in body_rendered)
+        // Otherwise fall back to campaign caption
+        $caption = '';
+        if (in_array($campaign->message_type, ['image', 'video', 'file']) && $campaign->caption) {
+            // If body_rendered contains the rendered caption, use it
+            $caption = $message->body_rendered ?? $campaign->caption;
+        }
+
+        switch ($campaign->message_type) {
+            case 'image':
+                $bridge->sendImage($message->phone_e164, $fileContents, $fileName, $caption);
+                break;
+            case 'video':
+                $bridge->sendVideo($message->phone_e164, $fileContents, $fileName, $caption);
+                break;
+            case 'audio':
+                $bridge->sendAudio($message->phone_e164, $fileContents, $fileName);
+                break;
+            case 'file':
+                $bridge->sendFile($message->phone_e164, $fileContents, $fileName, $caption);
+                break;
         }
     }
 
     /**
-     * Check if all messages in campaign are processed
+     * Send link message
+     */
+    private function sendLinkMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        if (!$campaign->link_url) {
+            throw new \Exception('Link URL is required');
+        }
+
+        // Use per-recipient rendered caption if available
+        $caption = $message->body_rendered ?? $campaign->caption ?? '';
+
+        $bridge->sendLink(
+            $message->phone_e164,
+            $campaign->link_url,
+            $caption
+        );
+    }
+
+    /**
+     * Send location message
+     */
+    private function sendLocationMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        if (!$campaign->latitude || !$campaign->longitude) {
+            throw new \Exception('Latitude and longitude are required');
+        }
+
+        $bridge->sendLocation(
+            $message->phone_e164,
+            $campaign->latitude,
+            $campaign->longitude
+        );
+    }
+
+    /**
+     * Send contact message
+     */
+    private function sendContactMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        if (!$campaign->contact_name || !$campaign->contact_phone) {
+            throw new \Exception('Contact name and phone are required');
+        }
+
+        $bridge->sendContact(
+            $message->phone_e164,
+            $campaign->contact_name,
+            $campaign->contact_phone
+        );
+    }
+
+    /**
+     * Send poll message
+     */
+    private function sendPollMessage($bridge, Message $message, Campaign $campaign): void
+    {
+        if (!$campaign->poll_question || !$campaign->poll_options) {
+            throw new \Exception('Poll question and options are required');
+        }
+
+        $bridge->sendPoll(
+            $message->phone_e164,
+            $campaign->poll_question,
+            $campaign->poll_options,
+            $campaign->poll_max_answer ?? 1
+        );
+    }
+
+    /**
+     * Check if campaign is complete
      */
     private function checkCampaignCompletion(Campaign $campaign): void
     {
         $campaign = $campaign->fresh();
 
-        // Calculate total processed (sent + failed)
         $totalProcessed = $campaign->sent_count + $campaign->failed_count;
 
-        // If all recipients processed, mark campaign as finished
         if ($totalProcessed >= $campaign->total_recipients) {
             $campaign->update([
                 'status' => 'finished',
@@ -275,18 +303,23 @@ class SendCampaignMessageJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error('SendCampaignMessage job failed completely', [
-            'campaign_id' => $this->campaignId,
-            'recipient_id' => $this->recipientId,
+            'message_id' => $this->messageId,
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),
         ]);
 
         try {
-            $campaign = Campaign::find($this->campaignId);
-            $recipient = Recipient::find($this->recipientId);
+            $message = Message::find($this->messageId);
+            if ($message) {
+                $message->update([
+                    'status' => 'failed',
+                    'error_code' => 'JOB_FAILED',
+                    'error_message' => substr($exception->getMessage(), 0, 500),
+                ]);
 
-            if ($campaign && $recipient) {
-                $this->createFailedMessage($campaign, $recipient, 'JOB_FAILED', $exception->getMessage());
+                if ($message->campaign) {
+                    $message->campaign->increment('failed_count');
+                }
             }
         } catch (\Exception $e) {
             Log::error('Failed to handle job failure', [
@@ -301,8 +334,8 @@ class SendCampaignMessageJob implements ShouldQueue
     public function tags(): array
     {
         return [
-            'campaign:' . $this->campaignId,
-            'recipient:' . $this->recipientId,
+            'campaign-message',
+            'message:' . $this->messageId,
         ];
     }
 }

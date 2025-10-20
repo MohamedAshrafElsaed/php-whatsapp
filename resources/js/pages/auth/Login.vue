@@ -13,24 +13,27 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AuthBase from '@/layouts/AuthLayout.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { register } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
 const props = defineProps<{
     status?: string;
 }>();
 
-const countryCodes = [
-    { code: '+1', country: 'US/Canada', digits: '10' },
-    { code: '+20', country: 'Egypt', digits: '10' },
-    { code: '+44', country: 'UK', digits: '10' },
-    { code: '+91', country: 'India', digits: '10' },
-    { code: '+971', country: 'UAE', digits: '9' },
-    { code: '+966', country: 'Saudi Arabia', digits: '9' },
-    { code: '+962', country: 'Jordan', digits: '9' },
-];
+const { t } = useTranslation();
+
+const countryCodes = computed(() => [
+    { code: '+1', country: t('auth.countries.us_canada'), digits: '10' },
+    { code: '+20', country: t('auth.countries.egypt'), digits: '10' },
+    { code: '+44', country: t('auth.countries.uk'), digits: '10' },
+    { code: '+91', country: t('auth.countries.india'), digits: '10' },
+    { code: '+971', country: t('auth.countries.uae'), digits: '9' },
+    { code: '+966', country: t('auth.countries.saudi_arabia'), digits: '9' },
+    { code: '+962', country: t('auth.countries.jordan'), digits: '9' },
+]);
 
 const selectedCountryCode = ref('+20');
 const phoneInput = ref('');
@@ -45,7 +48,7 @@ const handlePhoneInput = (event: Event) => {
     const cleanCountryCode = selectedCountryCode.value.replace('+', '');
 
     if (value.startsWith(cleanCountryCode)) {
-        phoneError.value = `Don't include country code ${selectedCountryCode.value} in the phone number`;
+        phoneError.value = t('auth.phone_error', { code: selectedCountryCode.value });
         value = value.substring(cleanCountryCode.length);
     } else if (value.startsWith('0')) {
         value = value.substring(1);
@@ -64,10 +67,10 @@ watch(selectedCountryCode, () => {
 
 <template>
     <AuthBase
-        description="Enter your phone number and password to log in"
-        title="Log in to your account"
+        :description="t('auth.login_description')"
+        :title="t('auth.login_title')"
     >
-        <Head title="Log in" />
+        <Head :title="t('auth.log_in')" />
 
         <div
             v-if="status"
@@ -83,14 +86,14 @@ watch(selectedCountryCode, () => {
         >
             <div class="grid gap-6">
                 <div class="grid gap-2">
-                    <Label for="phone">Phone Number</Label>
+                    <Label for="phone">{{ t('auth.phone') }}</Label>
                     <div class="flex flex-col gap-2 sm:flex-row">
                         <Select
                             v-model="selectedCountryCode"
                             name="country_code"
                         >
                             <SelectTrigger class="w-full sm:w-[140px]">
-                                <SelectValue placeholder="Code" />
+                                <SelectValue :placeholder="t('auth.placeholder.country_code')" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem
@@ -111,7 +114,7 @@ watch(selectedCountryCode, () => {
                             class="flex-1"
                             inputmode="numeric"
                             name="phone"
-                            placeholder="1099999999"
+                            :placeholder="t('auth.placeholder.phone')"
                             required
                             type="tel"
                             @input="handlePhoneInput"
@@ -125,13 +128,13 @@ watch(selectedCountryCode, () => {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="password">Password</Label>
+                    <Label for="password">{{ t('auth.password') }}</Label>
                     <Input
                         id="password"
                         :tabindex="2"
                         autocomplete="current-password"
                         name="password"
-                        placeholder="Password"
+                        :placeholder="t('auth.placeholder.password')"
                         required
                         type="password"
                     />
@@ -144,18 +147,21 @@ watch(selectedCountryCode, () => {
                     class="mt-4 w-full"
                     data-test="login-button"
                     type="submit"
+                    variant="default"
                 >
                     <LoaderCircle
                         v-if="processing"
                         class="h-4 w-4 animate-spin"
                     />
-                    Log in
+                    {{ processing ? t('auth.logging_in') : t('auth.log_in') }}
                 </Button>
             </div>
 
             <div class="text-center text-sm text-muted-foreground">
-                Don't have an account?
-                <TextLink :href="register()" :tabindex="4"> Sign up </TextLink>
+                {{ t('auth.dont_have_account') }}
+                <TextLink :href="register()" :tabindex="4">
+                    {{ t('auth.sign_up') }}
+                </TextLink>
             </div>
         </Form>
     </AuthBase>

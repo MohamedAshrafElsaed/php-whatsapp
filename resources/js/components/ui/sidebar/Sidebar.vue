@@ -36,7 +36,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
             :style="{
         '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
       }"
-            class="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+            class="w-(--sidebar-width) p-0 [&>button]:hidden !bg-sidebar text-sidebar-foreground"
             data-mobile="true"
             data-sidebar="sidebar"
             data-slot="sidebar"
@@ -45,7 +45,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
                 <SheetTitle>Sidebar</SheetTitle>
                 <SheetDescription>Displays the mobile sidebar.</SheetDescription>
             </SheetHeader>
-            <div class="flex h-full w-full flex-col">
+            <div class="flex h-full w-full flex-col bg-sidebar">
                 <slot />
             </div>
         </SheetContent>
@@ -60,7 +60,6 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
         class="group peer text-sidebar-foreground hidden md:block"
         data-slot="sidebar"
     >
-        <!-- This is what handles the sidebar gap on desktop  -->
         <div
             :class="cn(
         'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
@@ -77,7 +76,6 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
         side === 'left'
           ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
           : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
-        // Adjust the padding for floating and inset variants.
         variant === 'floating' || variant === 'inset'
           ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
           : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l',

@@ -7,12 +7,14 @@ use App\Models\Campaign;
 use App\Models\Import;
 use App\Models\Message;
 use App\Models\Recipient;
+use App\Models\Segment;
 use App\Models\WaSession;
 use App\Policies\AuditLogPolicy;
 use App\Policies\CampaignPolicy;
 use App\Policies\ImportPolicy;
 use App\Policies\MessagePolicy;
 use App\Policies\RecipientPolicy;
+use App\Policies\SegmentPolicy;
 use App\Policies\WaSessionPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
@@ -30,6 +32,7 @@ class AuthServiceProvider extends ServiceProvider
         Campaign::class => CampaignPolicy::class,
         Message::class => MessagePolicy::class,
         AuditLog::class => AuditLogPolicy::class,
+        Segment::class => SegmentPolicy::class,
     ];
 
     /**

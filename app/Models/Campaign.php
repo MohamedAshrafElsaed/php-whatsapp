@@ -28,6 +28,19 @@ class Campaign extends Model
         'sent_count',
         'failed_count',
         'settings_json',
+        'message_type',
+        'media_path',
+        'media_filename',
+        'media_mime_type',
+        'caption',
+        'link_url',
+        'latitude',
+        'longitude',
+        'contact_name',
+        'contact_phone',
+        'poll_question',
+        'poll_options',
+        'poll_max_answer',
     ];
 
     protected $casts = [
@@ -41,7 +54,22 @@ class Campaign extends Model
         'sent_count' => 'integer',
         'failed_count' => 'integer',
         'total_recipients' => 'integer',
+        'poll_options' => 'array',
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
     ];
+
+    /**
+     * Get the full URL for media file
+     */
+    public function getMediaUrlAttribute(): ?string
+    {
+        if (!$this->media_path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->media_path);
+    }
 
     /**
      * Get the user that owns the campaign
@@ -65,6 +93,14 @@ class Campaign extends Model
     public function waSession(): BelongsTo
     {
         return $this->belongsTo(WaSession::class, 'wa_session_id');
+    }
+
+    /**
+     * Get the segment associated with the campaign
+     */
+    public function segment(): BelongsTo
+    {
+        return $this->belongsTo(Segment::class);
     }
 
     /**

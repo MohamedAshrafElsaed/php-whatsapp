@@ -6,6 +6,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeatureRequestController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\SegmentController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\WaSessionController;
 use App\Http\Controllers\WebhookController;
@@ -40,6 +41,11 @@ Route::middleware(['auth'])->prefix('w')->name('wa.')->group(function () {
     Route::delete('/session/{deviceId}', [WaSessionController::class, 'destroy'])->name('session.destroy');
 
     Route::post('/session/{deviceId}/sync-contacts', [WaSessionController::class, 'syncContacts'])->name('wa.sync-contacts');
+
+
+    Route::post('/session/{deviceId}/reconnect', [WaSessionController::class, 'reconnect'])->name('session.reconnect');
+    Route::delete('/session/{deviceId}/force', [WaSessionController::class, 'forceDelete'])->name('session.force-delete');
+
 });
 
 // WhatsApp Settings
@@ -55,6 +61,15 @@ Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('imports
     Route::post('/imports', [ImportController::class, 'store'])->name('store');
     Route::get('/imports/{import}', [ImportController::class, 'show'])->name('show');
     Route::delete('/imports/{import}', [ImportController::class, 'destroy'])->name('destroy');
+    Route::prefix('segments')->name('segments.')->group(function () {
+        Route::get('/', [SegmentController::class, 'index'])->name('index');
+        Route::get('/create', [SegmentController::class, 'create'])->name('create');
+        Route::post('/', [SegmentController::class, 'store'])->name('store');
+        Route::get('/{segment}', [SegmentController::class, 'show'])->name('show');
+        Route::get('/{segment}/edit', [SegmentController::class, 'edit'])->name('edit');
+        Route::put('/{segment}', [SegmentController::class, 'update'])->name('update');
+        Route::delete('/{segment}', [SegmentController::class, 'destroy'])->name('destroy');
+    });
 });
 
 // CRM Contact Routes
@@ -116,5 +131,19 @@ Route::post('/webhook/whatsapp', [WebhookController::class, 'handle'])->name('we
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
+
+Route::get('/lang/{locale}', function ($locale) {
+    if (in_array($locale, ['en', 'ar'])) {
+        session(['locale' => $locale]);
+
+        // Update user preference if authenticated
+        if (auth()->check()) {
+            auth()->user()->update(['locale' => $locale]);
+        }
+    }
+
+    return redirect()->back();
+})->name('lang.switch');
+
 
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');

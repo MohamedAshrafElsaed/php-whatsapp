@@ -1,10 +1,23 @@
 <script lang="ts" setup>
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/composables/useTranslation';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { Eye, Plus, Search, Send, Trash2, Users, Mail, Phone as PhoneIcon } from 'lucide-vue-next';
+import {
+    Eye, Plus, Search, Trash2, Users,
+    Mail, Phone as PhoneIcon, ArrowUpRight, Upload, MoreVertical
+} from 'lucide-vue-next';
 import { ref, watch } from 'vue';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const { t, isRTL } = useTranslation();
 
 interface Contact {
     id: number;
@@ -39,7 +52,6 @@ const searchForm = useForm({
 
 const searchQuery = ref(props.search || '');
 
-// Debounced search
 let searchTimeout: ReturnType<typeof setTimeout>;
 watch(searchQuery, (value) => {
     clearTimeout(searchTimeout);
@@ -53,11 +65,7 @@ watch(searchQuery, (value) => {
 });
 
 const deleteContact = (contactId: number) => {
-    if (
-        confirm(
-            'Are you sure you want to delete this contact? This action cannot be undone.',
-        )
-    ) {
+    if (confirm(t('contacts.confirm_delete'))) {
         router.delete(`/contacts/${contactId}`, {
             preserveScroll: true,
         });
@@ -67,257 +75,338 @@ const deleteContact = (contactId: number) => {
 
 <template>
     <AppLayout>
-        <Head title="All Contacts" />
+        <Head :title="t('contacts.title')" />
 
-        <div class="mx-auto max-w-7xl space-y-4 p-4 md:space-y-6 md:p-6">
-            <!-- Header -->
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 class="text-xl font-bold tracking-tight md:text-2xl lg:text-3xl">
-                        All Contacts
-                    </h1>
-                    <p class="mt-1 text-sm text-muted-foreground md:mt-2">
-                        Manage and send messages to your contacts
-                    </p>
+        <div class="min-h-screen bg-background">
+            <div class="mx-auto max-w-7xl space-y-4 p-4 sm:space-y-6 sm:p-6 lg:p-8">
+                <!-- Header Section -->
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="space-y-1">
+                        <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">
+                            {{ t('contacts.title') }}
+                        </h1>
+                        <p class="text-sm text-muted-foreground sm:text-base">
+                            {{ t('contacts.description') }}
+                        </p>
+                    </div>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Link href="/contacts/imports" class="flex-1 sm:flex-none">
+                            <Button variant="outline" class="w-full">
+                                <Upload class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                <span class="hidden sm:inline">{{ t('contacts.import_contacts') }}</span>
+                                <span class="sm:hidden">{{ t('contacts.import') }}</span>
+                            </Button>
+                        </Link>
+                        <Link href="/contacts/create" class="flex-1 sm:flex-none">
+                            <Button variant="default" class="w-full">
+                                <Plus class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                {{ t('contacts.add') }}
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
-                <Link href="/contacts/create">
-                    <Button class="w-full sm:w-auto">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Contact
-                    </Button>
-                </Link>
-            </div>
 
-            <!-- Search Bar -->
-            <div class="flex items-center gap-4">
-                <div class="relative flex-1">
+                <!-- Statistics Card -->
+                <div class="rounded-lg border bg-gradient-to-br from-purple-50 to-blue-50 p-4 shadow-sm dark:from-purple-950/20 dark:to-blue-950/20">
+                    <div class="flex items-center gap-3">
+                        <div class="shrink-0 rounded-full bg-purple-100 p-2.5 dark:bg-purple-900">
+                            <Users class="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-base font-semibold sm:text-lg">
+                                {{ contacts.total }} {{ t('contacts.title') }}
+                            </p>
+                            <p class="text-xs text-muted-foreground sm:text-sm">
+                                {{ t('contacts.import_or_add') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="relative">
                     <Search
-                        class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        :class="[
+                            'pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground',
+                            isRTL ? 'right-3' : 'left-3'
+                        ]"
                     />
                     <Input
                         v-model="searchQuery"
-                        class="pl-10"
-                        placeholder="Search by name, phone, or email..."
-                        type="text"
+                        :class="isRTL ? 'pr-10' : 'pl-10'"
+                        :placeholder="t('contacts.search')"
+                        type="search"
+                        class="h-10 sm:h-11"
                     />
                 </div>
-            </div>
 
-            <!-- Desktop Table View (hidden on mobile) -->
-            <div class="hidden overflow-hidden rounded-lg border bg-card md:block">
-                <div v-if="contacts.data.length > 0" class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead class="border-b bg-muted/50">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-sm font-medium md:px-6">
-                                Name
-                            </th>
-                            <th class="px-4 py-3 text-left text-sm font-medium md:px-6">
-                                Phone
-                            </th>
-                            <th class="px-4 py-3 text-left text-sm font-medium md:px-6">
-                                Email
-                            </th>
-                            <th class="px-4 py-3 text-left text-sm font-medium md:px-6">
-                                Source
-                            </th>
-                            <th class="px-4 py-3 text-left text-sm font-medium md:px-6">
-                                Last Message
-                            </th>
-                            <th class="px-4 py-3 text-right text-sm font-medium md:px-6">
-                                Actions
-                            </th>
-                        </tr>
-                        </thead>
-                        <tbody class="divide-y">
-                        <tr
+                <!-- Contacts List -->
+                <div v-if="contacts.data.length > 0" class="rounded-lg border bg-card shadow-sm">
+                    <!-- Desktop Table View -->
+                    <div class="hidden overflow-x-auto lg:block">
+                        <table class="w-full">
+                            <thead class="border-b bg-muted/30">
+                            <tr>
+                                <th class="px-4 py-3 text-start text-sm font-medium xl:px-6">
+                                    {{ t('contacts.name') }}
+                                </th>
+                                <th class="px-4 py-3 text-start text-sm font-medium xl:px-6">
+                                    {{ t('contacts.phone') }}
+                                </th>
+                                <th class="px-4 py-3 text-start text-sm font-medium xl:px-6">
+                                    {{ t('contacts.email') }}
+                                </th>
+                                <th class="px-4 py-3 text-start text-sm font-medium xl:px-6">
+                                    {{ t('contacts.source') }}
+                                </th>
+                                <th class="px-4 py-3 text-start text-sm font-medium xl:px-6">
+                                    {{ t('contacts.last_message') }}
+                                </th>
+                                <th class="px-4 py-3 text-end text-sm font-medium xl:px-6">
+                                    {{ t('contacts.actions') }}
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                            <tr
+                                v-for="contact in contacts.data"
+                                :key="contact.id"
+                                class="transition-colors hover:bg-muted/50"
+                            >
+                                <td class="px-4 py-4 xl:px-6">
+                                    <div class="font-medium">
+                                        {{ contact.full_name || t('contacts.no_name') }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4 font-mono text-sm text-muted-foreground xl:px-6">
+                                    {{ contact.phone_e164 }}
+                                </td>
+                                <td class="px-4 py-4 text-sm text-muted-foreground xl:px-6">
+                                    {{ contact.email || '-' }}
+                                </td>
+                                <td class="px-4 py-4 xl:px-6">
+                                    <Badge variant="secondary" class="text-xs">
+                                        {{ contact.import_source }}
+                                    </Badge>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-muted-foreground xl:px-6">
+                                    {{ contact.last_message_date || t('contacts.never') }}
+                                </td>
+                                <td class="px-4 py-4 xl:px-6">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <Link :href="`/contacts/${contact.id}`">
+                                            <Button size="sm" variant="ghost">
+                                                <Eye class="h-4 w-4" />
+                                                <span class="sr-only">{{ t('common.view') }}</span>
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            @click="deleteContact(contact.id)"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
+                                            <span class="sr-only">{{ t('common.delete') }}</span>
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tablet View -->
+                    <div class="hidden divide-y sm:block lg:hidden">
+                        <div
                             v-for="contact in contacts.data"
                             :key="contact.id"
-                            class="hover:bg-muted/30"
+                            class="flex items-center justify-between p-4 transition-colors hover:bg-muted/50"
                         >
-                            <td class="px-4 py-4 text-sm font-medium md:px-6">
-                                {{ contact.full_name || 'N/A' }}
-                            </td>
-                            <td class="px-4 py-4 text-sm text-muted-foreground md:px-6">
-                                {{ contact.phone_e164 }}
-                            </td>
-                            <td class="px-4 py-4 text-sm text-muted-foreground md:px-6">
-                                {{ contact.email || '-' }}
-                            </td>
-                            <td class="px-4 py-4 text-sm text-muted-foreground md:px-6">
-                                {{ contact.import_source }}
-                            </td>
-                            <td class="px-4 py-4 text-sm text-muted-foreground md:px-6">
-                                {{ contact.last_message_date || 'Never contacted' }}
-                            </td>
-                            <td class="px-4 py-4 text-right md:px-6">
-                                <div class="flex items-center justify-end gap-2">
-                                    <Link :href="`/contacts/${contact.id}`">
-                                        <Button size="sm" variant="ghost">
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </Link>
-                                    <Link :href="`/contacts/${contact.id}`">
-                                        <Button size="sm" variant="ghost">
-                                            <Send class="h-4 w-4" />
-                                        </Button>
-                                    </Link>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
+                            <Link
+                                :href="`/contacts/${contact.id}`"
+                                class="flex min-w-0 flex-1 items-center gap-3"
+                            >
+                                <div class="shrink-0 rounded-lg bg-purple-100 p-2 dark:bg-purple-950">
+                                    <Users class="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate font-medium">
+                                        {{ contact.full_name || t('contacts.no_name') }}
+                                    </p>
+                                    <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <span class="truncate font-mono">{{ contact.phone_e164 }}</span>
+                                        <Badge variant="secondary" class="shrink-0 text-xs">
+                                            {{ contact.import_source }}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </Link>
+                            <div class="flex shrink-0 items-center gap-1">
+                                <Link :href="`/contacts/${contact.id}`">
+                                    <Button size="icon" variant="ghost" class="h-8 w-8">
+                                        <Eye class="h-4 w-4" />
+                                        <span class="sr-only">{{ t('common.view') }}</span>
+                                    </Button>
+                                </Link>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    @click="deleteContact(contact.id)"
+                                >
+                                    <Trash2 class="h-4 w-4" />
+                                    <span class="sr-only">{{ t('common.delete') }}</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile Card View -->
+                    <div class="divide-y sm:hidden">
+                        <div
+                            v-for="contact in contacts.data"
+                            :key="contact.id"
+                            class="flex items-center gap-3 p-4 transition-colors hover:bg-muted/50"
+                        >
+                            <Link
+                                :href="`/contacts/${contact.id}`"
+                                class="flex min-w-0 flex-1 items-center gap-3"
+                            >
+                                <div class="shrink-0 rounded-lg bg-purple-100 p-2 dark:bg-purple-950">
+                                    <Users class="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate font-medium">
+                                        {{ contact.full_name || t('contacts.no_name') }}
+                                    </p>
+                                    <p class="truncate font-mono text-sm text-muted-foreground">
+                                        {{ contact.phone_e164 }}
+                                    </p>
+                                </div>
+                            </Link>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger as-child>
+                                    <Button size="icon" variant="ghost" class="h-8 w-8 shrink-0">
+                                        <MoreVertical class="h-4 w-4" />
+                                        <span class="sr-only">{{ t('contacts.actions') }}</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem as-child>
+                                        <Link :href="`/contacts/${contact.id}`" class="flex items-center">
+                                            <Eye class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                            {{ t('common.view') }}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        class="text-destructive focus:text-destructive"
                                         @click="deleteContact(contact.id)"
                                     >
-                                        <Trash2 class="h-4 w-4 text-destructive" />
-                                    </Button>
-                                </div>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Desktop Empty State -->
-                <div
-                    v-if="contacts.data.length === 0"
-                    class="flex flex-col items-center justify-center px-4 py-12"
-                >
-                    <Users class="mb-4 h-12 w-12 text-muted-foreground" />
-                    <h3 class="mb-2 text-lg font-semibold">No contacts yet</h3>
-                    <p class="mb-4 text-center text-sm text-muted-foreground">
-                        {{
-                            searchQuery
-                                ? 'No contacts match your search.'
-                                : 'Import contacts or add them manually to get started.'
-                        }}
-                    </p>
-                    <div v-if="!searchQuery" class="flex gap-2">
-                        <Link href="/contacts/imports">
-                            <Button variant="outline">Import Contacts</Button>
-                        </Link>
-                        <Link href="/contacts/create">
-                            <Button>
-                                <Plus class="mr-2 h-4 w-4" />
-                                Add Contact
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mobile Card View (visible only on mobile) -->
-            <div class="space-y-3 md:hidden">
-                <div
-                    v-for="contact in contacts.data"
-                    :key="contact.id"
-                    class="overflow-hidden rounded-lg border bg-card"
-                >
-                    <div class="p-4">
-                        <!-- Contact Name -->
-                        <div class="mb-3 flex items-start justify-between gap-2">
-                            <h3 class="text-base font-semibold">
-                                {{ contact.full_name || 'N/A' }}
-                            </h3>
-                        </div>
-
-                        <!-- Contact Info -->
-                        <div class="space-y-2 text-sm">
-                            <div class="flex items-center gap-2 text-muted-foreground">
-                                <PhoneIcon class="h-4 w-4 shrink-0" />
-                                <span class="truncate">{{ contact.phone_e164 }}</span>
-                            </div>
-                            <div v-if="contact.email" class="flex items-center gap-2 text-muted-foreground">
-                                <Mail class="h-4 w-4 shrink-0" />
-                                <span class="truncate">{{ contact.email }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Additional Info -->
-                        <div class="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-                            <span class="truncate">{{ contact.import_source }}</span>
-                            <span class="shrink-0">
-                                {{ contact.last_message_date || 'Never contacted' }}
-                            </span>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="mt-3 flex gap-2">
-                            <Link :href="`/contacts/${contact.id}`" class="flex-1">
-                                <Button size="sm" variant="outline" class="w-full">
-                                    <Eye class="mr-2 h-4 w-4" />
-                                    View
-                                </Button>
-                            </Link>
-                            <Link :href="`/contacts/${contact.id}`" class="flex-1">
-                                <Button size="sm" class="w-full">
-                                    <Send class="mr-2 h-4 w-4" />
-                                    Message
-                                </Button>
-                            </Link>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                @click="deleteContact(contact.id)"
-                            >
-                                <Trash2 class="h-4 w-4 text-destructive" />
-                            </Button>
+                                        <Trash2 class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                        {{ t('common.delete') }}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
                 </div>
 
-                <!-- Mobile Empty State -->
+                <!-- Empty State -->
                 <div
-                    v-if="contacts.data.length === 0"
-                    class="flex flex-col items-center justify-center rounded-lg border bg-card p-8"
+                    v-else
+                    class="flex flex-col items-center justify-center rounded-lg border bg-card p-8 shadow-sm sm:p-12"
                 >
-                    <Users class="mb-4 h-12 w-12 text-muted-foreground" />
-                    <h3 class="mb-2 text-base font-semibold">No contacts yet</h3>
+                    <div class="mb-4 rounded-full bg-muted p-4">
+                        <Users class="h-10 w-10 text-muted-foreground sm:h-12 sm:w-12" />
+                    </div>
+                    <h3 class="mb-2 text-center text-lg font-semibold">
+                        {{ t('contacts.no_contacts') }}
+                    </h3>
                     <p class="mb-4 text-center text-sm text-muted-foreground">
-                        {{
-                            searchQuery
-                                ? 'No contacts match your search.'
-                                : 'Import contacts or add them manually to get started.'
-                        }}
+                        {{ t('contacts.import_or_add') }}
                     </p>
-                    <div v-if="!searchQuery" class="flex w-full flex-col gap-2">
-                        <Link href="/contacts/imports">
+                    <div class="flex w-full max-w-sm flex-col gap-2 sm:flex-row">
+                        <Link href="/contacts/imports" class="flex-1">
                             <Button variant="outline" class="w-full">
-                                Import Contacts
+                                <Upload class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                {{ t('contacts.import_contacts') }}
                             </Button>
                         </Link>
-                        <Link href="/contacts/create">
-                            <Button class="w-full">
-                                <Plus class="mr-2 h-4 w-4" />
-                                Add Contact
+                        <Link href="/contacts/create" class="flex-1">
+                            <Button variant="default" class="w-full">
+                                <Plus class="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                                {{ t('contacts.add') }}
                             </Button>
                         </Link>
                     </div>
                 </div>
-            </div>
 
-            <!-- Pagination -->
-            <div
-                v-if="contacts.data.length > 0"
-                class="flex flex-col items-center justify-between gap-4 sm:flex-row"
-            >
-                <p class="text-sm text-muted-foreground">
-                    Showing {{ contacts.data.length }} of {{ contacts.total }} contacts
-                </p>
-                <div class="flex flex-wrap justify-center gap-2">
-                    <Link
-                        v-for="link in contacts.links"
-                        :key="link.label"
-                        :class="[
-                            'rounded border px-3 py-1 text-sm',
-                            link.active
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-border bg-background hover:bg-muted',
-                            !link.url && 'pointer-events-none opacity-50',
-                        ]"
-                        :href="link.url || '#'"
-                        v-html="link.label"
-                    />
+                <!-- Pagination -->
+                <div
+                    v-if="contacts.data.length > 0"
+                    class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p class="text-sm text-muted-foreground">
+                        {{ t('contacts.showing', {
+                        from: (contacts.current_page - 1) * contacts.per_page + 1,
+                        to: Math.min(contacts.current_page * contacts.per_page, contacts.total),
+                        total: contacts.total
+                    }) }}
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <Link
+                            v-for="link in contacts.links"
+                            :key="link.label"
+                            :href="link.url || '#'"
+                            :class="[
+                                'inline-flex min-w-[2.5rem] items-center justify-center rounded-md border px-3 py-2 text-sm transition-colors',
+                                link.active
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'hover:bg-muted',
+                                !link.url && 'pointer-events-none opacity-50'
+                            ]"
+                            v-html="link.label"
+                        />
+                    </div>
                 </div>
             </div>
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+/* Cairo font for Arabic */
+:root[dir="rtl"] {
+    font-family: 'Cairo', sans-serif;
+}
+
+/* Inter font for English */
+:root[dir="ltr"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Ensure proper text alignment in RTL */
+[dir="rtl"] .text-start {
+    text-align: right;
+}
+
+[dir="ltr"] .text-start {
+    text-align: left;
+}
+
+[dir="rtl"] .text-end {
+    text-align: left;
+}
+
+[dir="ltr"] .text-end {
+    text-align: right;
+}
+
+/* Smooth transitions */
+* {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+</style>

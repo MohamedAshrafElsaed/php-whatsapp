@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -9,330 +12,445 @@ import {
     Send,
     Upload,
     Users,
+    Smartphone,
+    FileText,
+    Zap,
+    Shield,
+    BarChart3,
+    Clock,
+    Globe2,
+    TrendingUp,
 } from 'lucide-vue-next';
+
+const { t } = useTranslation();
+
+const features = [
+    {
+        icon: MessageSquare,
+        title: t('features.whatsapp_connection.title'),
+        description: t('features.whatsapp_connection.description'),
+        gradient: 'from-green-500 to-emerald-600',
+    },
+    {
+        icon: Upload,
+        title: t('features.import_contacts.title'),
+        description: t('features.import_contacts.description'),
+        gradient: 'from-blue-500 to-cyan-600',
+    },
+    {
+        icon: Send,
+        title: t('features.bulk_campaigns.title'),
+        description: t('features.bulk_campaigns.description'),
+        gradient: 'from-purple-500 to-pink-600',
+    },
+    {
+        icon: Users,
+        title: t('features.contact_management.title'),
+        description: t('features.contact_management.description'),
+        gradient: 'from-orange-500 to-red-600',
+    },
+    {
+        icon: Smartphone,
+        title: t('features.multi_device.title'),
+        description: t('features.multi_device.description'),
+        gradient: 'from-indigo-500 to-purple-600',
+    },
+    {
+        icon: FileText,
+        title: t('features.message_types.title'),
+        description: t('features.message_types.description'),
+        gradient: 'from-teal-500 to-green-600',
+    },
+    {
+        icon: Zap,
+        title: t('features.personalization.title'),
+        description: t('features.personalization.description'),
+        gradient: 'from-yellow-500 to-orange-600',
+    },
+    {
+        icon: Shield,
+        title: t('features.rate_limiting.title'),
+        description: t('features.rate_limiting.description'),
+        gradient: 'from-red-500 to-pink-600',
+    },
+];
+
+const benefits = [
+    {
+        title: t('benefits.simple.title'),
+        description: t('benefits.simple.description'),
+    },
+    {
+        title: t('benefits.safe.title'),
+        description: t('benefits.safe.description'),
+    },
+    {
+        title: t('benefits.personalized.title'),
+        description: t('benefits.personalized.description'),
+    },
+    {
+        title: t('benefits.tracking.title'),
+        description: t('benefits.tracking.description'),
+    },
+];
+
+const pricingFeatures = [
+    t('pricing.features.unlimited_contacts'),
+    t('pricing.features.unlimited_campaigns'),
+    t('pricing.features.csv_excel'),
+    t('pricing.features.personalization'),
+    t('pricing.features.scheduling'),
+    t('pricing.features.support'),
+];
 </script>
 
 <template>
-    <Head title="Welcome" />
+    <Head>
+        <title>{{ t('app_name') }} - {{ t('tagline') }}</title>
+        <meta :content="t('description')" name="description" />
+    </Head>
 
-    <div class="min-h-screen bg-gradient-to-b from-background to-muted/30">
+    <div class="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
         <!-- Header -->
         <header
-            class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+            class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
         >
             <div
-                class="container mx-auto flex h-16 items-center justify-between px-4"
+                class="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8"
             >
-                <div class="flex items-center gap-2">
-                    <MessageSquare class="h-5 w-5 text-primary md:h-6 md:w-6" />
-                    <span class="text-lg font-bold md:text-xl"
-                        >BulkWhatsApp</span
+                <Link
+                    class="flex items-center gap-2 transition-opacity hover:opacity-80"
+                    href="/"
+                >
+                    <div
+                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg"
                     >
-                </div>
-                <div class="flex items-center gap-2 md:gap-3">
+                        <MessageSquare class="h-5 w-5 text-white" />
+                    </div>
+                    <span class="hidden text-xl font-bold sm:inline-block">{{
+                            t('app_name')
+                        }}</span>
+                </Link>
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <LanguageSwitcher />
                     <Link href="/login">
-                        <Button class="text-sm" size="sm" variant="ghost"
-                            >Login</Button
+                        <Button
+                            class="hidden sm:inline-flex"
+                            size="sm"
+                            variant="ghost"
+                        >{{ t('nav.login') }}</Button
                         >
                     </Link>
                     <Link href="/register">
-                        <Button class="text-sm" size="sm">Get Started</Button>
+                        <Button class="shadow-lg" size="sm">{{
+                                t('nav.get_started')
+                            }}</Button>
                     </Link>
                 </div>
             </div>
         </header>
 
         <!-- Hero Section -->
-        <section class="container mx-auto px-4 py-12 text-center md:py-20">
-            <Badge class="mb-4 md:mb-6" variant="secondary">
-                Bulk Messaging Made Simple
-            </Badge>
-            <h1
-                class="mb-4 text-3xl font-bold tracking-tight md:mb-6 md:text-5xl lg:text-6xl"
-            >
-                Send WhatsApp Messages<br />
-                <span class="text-primary">in Bulk</span>
-            </h1>
-            <p
-                class="mx-auto mb-6 max-w-2xl px-4 text-base text-muted-foreground md:mb-8 md:text-lg"
-            >
-                Connect your WhatsApp, import contacts, and send personalized
-                bulk messages effortlessly. Perfect for businesses, marketers,
-                and teams who need to reach their audience at scale.
-            </p>
-            <div
-                class="flex flex-col items-center justify-center gap-3 sm:flex-row md:gap-4"
-            >
-                <Link class="w-full sm:w-auto" href="/register">
-                    <Button class="w-full gap-2 sm:w-auto" size="lg">
-                        Start Free Trial
-                        <ArrowRight class="h-4 w-4" />
-                    </Button>
-                </Link>
-                <Link class="w-full sm:w-auto" href="/login">
-                    <Button
-                        class="w-full sm:w-auto"
-                        size="lg"
-                        variant="outline"
+        <section class="container mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
+            <div class="text-center">
+                <Badge
+                    class="mb-6 px-4 py-2 text-sm font-medium shadow-sm"
+                    variant="secondary"
+                >
+                    <Zap class="mr-2 h-4 w-4" />
+                    {{ t('hero.badge') }}
+                </Badge>
+
+                <h1
+                    class="mx-auto mb-6 max-w-4xl text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
+                >
+                    {{ t('hero.title') }}
+                    <span
+                        class="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+                    >{{ t('hero.title_highlight') }}</span
                     >
-                        Sign In
-                    </Button>
-                </Link>
+                </h1>
+
+                <p
+                    class="mx-auto mb-8 max-w-2xl text-base text-muted-foreground sm:text-lg md:text-xl"
+                >
+                    {{ t('hero.description') }}
+                </p>
+
+                <div
+                    class="flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4"
+                >
+                    <Link class="w-full sm:w-auto" href="/register">
+                        <Button
+                            class="group w-full gap-2 shadow-lg transition-all hover:shadow-xl sm:w-auto"
+                            size="lg"
+                            variant="default"
+                        >
+                            {{ t('hero.start_trial') }}
+                            <ArrowRight
+                                class="h-4 w-4 transition-transform group-hover:translate-x-1"
+                            />
+                        </Button>
+                    </Link>
+                    <Link class="w-full sm:w-auto" href="/login">
+                        <Button
+                            class="w-full shadow-sm sm:w-auto"
+                            size="lg"
+                            variant="outline"
+                        >
+                            {{ t('hero.sign_in') }}
+                        </Button>
+                    </Link>
+                </div>
+
+                <!-- Stats -->
+                <div
+                    class="mt-16 grid grid-cols-2 gap-6 sm:grid-cols-4 sm:gap-8"
+                >
+                    <div class="text-center">
+                        <div
+                            class="mb-2 text-3xl font-bold text-foreground sm:text-4xl"
+                        >
+                            1000+
+                        </div>
+                        <div class="text-sm text-muted-foreground">
+                            {{ t('features.multi_device.title') }}
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div
+                            class="mb-2 text-3xl font-bold text-foreground sm:text-4xl"
+                        >
+                            15/min
+                        </div>
+                        <div class="text-sm text-muted-foreground">
+                            Safe Rate Limit
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div
+                            class="mb-2 text-3xl font-bold text-foreground sm:text-4xl"
+                        >
+                            8+
+                        </div>
+                        <div class="text-sm text-muted-foreground">
+                            Message Types
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div
+                            class="mb-2 text-3xl font-bold text-foreground sm:text-4xl"
+                        >
+                            100%
+                        </div>
+                        <div class="text-sm text-muted-foreground">
+                            Secure & Private
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
         <!-- Features Section -->
-        <section class="container mx-auto px-4 py-12 md:py-16">
-            <h2
-                class="mb-8 text-center text-2xl font-bold md:mb-12 md:text-3xl"
-            >
-                Everything You Need
-            </h2>
-            <div class="grid gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-4">
-                <!-- Feature 1 -->
-                <div class="rounded-lg border bg-card p-4 text-center md:p-6">
-                    <div
-                        class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
+        <section class="border-y bg-muted/30 py-16 sm:py-20 lg:py-24">
+            <div class="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="mb-12 text-center sm:mb-16">
+                    <h2
+                        class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
                     >
-                        <MessageSquare class="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 class="mb-2 text-base font-semibold md:text-lg">
-                        WhatsApp Connection
-                    </h3>
-                    <p class="text-sm text-muted-foreground">
-                        Connect your WhatsApp account with QR code or pairing
-                        code in seconds
+                        {{ t('features.title') }}
+                    </h2>
+                    <p
+                        class="mx-auto max-w-2xl text-base text-muted-foreground sm:text-lg"
+                    >
+                        Everything you need to run successful WhatsApp marketing
+                        campaigns
                     </p>
                 </div>
 
-                <!-- Feature 2 -->
-                <div class="rounded-lg border bg-card p-4 text-center md:p-6">
-                    <div
-                        class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
+                <div
+                    class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8"
+                >
+                    <Card
+                        v-for="(feature, index) in features"
+                        :key="index"
+                        class="group relative overflow-hidden border-2 transition-all hover:border-primary/50 hover:shadow-xl"
                     >
-                        <Upload class="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 class="mb-2 text-base font-semibold md:text-lg">
-                        Import Contacts
-                    </h3>
-                    <p class="text-sm text-muted-foreground">
-                        Upload CSV or Excel files with automatic phone
-                        validation and deduplication
-                    </p>
-                </div>
-
-                <!-- Feature 3 -->
-                <div class="rounded-lg border bg-card p-4 text-center md:p-6">
-                    <div
-                        class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
-                    >
-                        <Send class="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 class="mb-2 text-base font-semibold md:text-lg">
-                        Bulk Campaigns
-                    </h3>
-                    <p class="text-sm text-muted-foreground">
-                        Create and schedule campaigns with personalized messages
-                        and smart rate limiting
-                    </p>
-                </div>
-
-                <!-- Feature 4 -->
-                <div class="rounded-lg border bg-card p-4 text-center md:p-6">
-                    <div
-                        class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
-                    >
-                        <Users class="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 class="mb-2 text-base font-semibold md:text-lg">
-                        Contact Management
-                    </h3>
-                    <p class="text-sm text-muted-foreground">
-                        Organize contacts, track message history, and send
-                        individual messages
-                    </p>
+                        <CardContent class="p-6">
+                            <div
+                                :class="[
+                                    'mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg transition-transform group-hover:scale-110',
+                                    feature.gradient,
+                                ]"
+                            >
+                                <component
+                                    :is="feature.icon"
+                                    class="h-7 w-7 text-white"
+                                />
+                            </div>
+                            <h3
+                                class="mb-2 text-lg font-semibold text-foreground"
+                            >
+                                {{ feature.title }}
+                            </h3>
+                            <p class="text-sm leading-relaxed text-muted-foreground">
+                                {{ feature.description }}
+                            </p>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </section>
 
         <!-- Benefits Section -->
-        <section class="border-y bg-muted/30 py-12 md:py-16">
-            <div class="container mx-auto px-4">
-                <h2
-                    class="mb-8 text-center text-2xl font-bold md:mb-12 md:text-3xl"
-                >
-                    Why Choose BulkWhatsApp?
-                </h2>
-                <div class="mx-auto max-w-3xl space-y-4">
-                    <div class="flex items-start gap-3">
-                        <CheckCircle2
-                            class="mt-1 h-5 w-5 flex-shrink-0 text-primary"
-                        />
-                        <div>
-                            <h3 class="text-sm font-semibold md:text-base">
-                                Simple & Intuitive
-                            </h3>
-                            <p class="text-sm text-muted-foreground">
-                                No technical knowledge required. Connect
-                                WhatsApp and start sending messages in minutes.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <CheckCircle2
-                            class="mt-1 h-5 w-5 flex-shrink-0 text-primary"
-                        />
-                        <div>
-                            <h3 class="text-sm font-semibold md:text-base">
-                                Safe & Reliable
-                            </h3>
-                            <p class="text-sm text-muted-foreground">
-                                Built-in rate limiting protects your WhatsApp
-                                account from being banned.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <CheckCircle2
-                            class="mt-1 h-5 w-5 flex-shrink-0 text-primary"
-                        />
-                        <div>
-                            <h3 class="text-sm font-semibold md:text-base">
-                                Personalized Messages
-                            </h3>
-                            <p class="text-sm text-muted-foreground">
-                                Use merge tags to customize each message with
-                                recipient's name and other details.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <CheckCircle2
-                            class="mt-1 h-5 w-5 flex-shrink-0 text-primary"
-                        />
-                        <div>
-                            <h3 class="text-sm font-semibold md:text-base">
-                                Track Everything
-                            </h3>
-                            <p class="text-sm text-muted-foreground">
-                                Monitor campaign progress, message delivery
-                                status, and message history.
-                            </p>
-                        </div>
-                    </div>
+        <section class="py-16 sm:py-20 lg:py-24">
+            <div class="container mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+                <div class="mb-12 text-center sm:mb-16">
+                    <h2
+                        class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
+                    >
+                        {{ t('benefits.title') }}
+                    </h2>
+                </div>
+
+                <div class="space-y-6">
+                    <Card
+                        v-for="(benefit, index) in benefits"
+                        :key="index"
+                        class="border-2 transition-all hover:border-primary/50 hover:shadow-lg"
+                    >
+                        <CardContent class="flex items-start gap-4 p-6">
+                            <div
+                                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10"
+                            >
+                                <CheckCircle2
+                                    class="h-6 w-6 text-primary"
+                                />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3
+                                    class="mb-2 text-lg font-semibold text-foreground"
+                                >
+                                    {{ benefit.title }}
+                                </h3>
+                                <p class="text-sm leading-relaxed text-muted-foreground">
+                                    {{ benefit.description }}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </section>
 
         <!-- Pricing Section -->
-        <section class="container mx-auto px-4 py-12 md:py-16">
-            <div class="mx-auto max-w-2xl text-center">
-                <h2 class="mb-4 text-2xl font-bold md:text-3xl">
-                    Simple Pricing
-                </h2>
-                <p
-                    class="mb-6 text-sm text-muted-foreground md:mb-8 md:text-base"
-                >
-                    One plan, unlimited features. Start your free trial today.
-                </p>
-                <div class="rounded-lg border bg-card p-6 md:p-8">
-                    <Badge class="mb-4" variant="secondary">
-                        Coming Soon
-                    </Badge>
-                    <div class="mb-2 text-4xl font-bold md:text-5xl">
-                        700 LE
-                    </div>
-                    <div
-                        class="mb-6 text-sm text-muted-foreground md:text-base"
+        <section class="border-y bg-muted/30 py-16 sm:py-20 lg:py-24">
+            <div class="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+                <div class="mb-12 text-center sm:mb-16">
+                    <h2
+                        class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
                     >
-                        per month
-                    </div>
-                    <ul class="mb-6 space-y-3 text-left md:mb-8">
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>Unlimited contacts</span>
-                        </li>
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>Unlimited campaigns</span>
-                        </li>
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>CSV/Excel import</span>
-                        </li>
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>Message personalization</span>
-                        </li>
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>Campaign scheduling</span>
-                        </li>
-                        <li
-                            class="flex items-center gap-2 text-sm md:text-base"
-                        >
-                            <CheckCircle2
-                                class="h-5 w-5 shrink-0 text-primary"
-                            />
-                            <span>Email support</span>
-                        </li>
-                    </ul>
-                    <Link href="/register">
-                        <Button class="w-full" size="lg">
-                            Start Free Trial
-                        </Button>
-                    </Link>
+                        {{ t('pricing.title') }}
+                    </h2>
+                    <p
+                        class="mx-auto max-w-2xl text-base text-muted-foreground sm:text-lg"
+                    >
+                        {{ t('pricing.subtitle') }}
+                    </p>
                 </div>
+
+                <Card
+                    class="border-2 border-primary/20 shadow-2xl"
+                >
+                    <CardContent class="p-8 sm:p-10">
+                        <div class="text-center">
+                            <Badge
+                                class="mb-6 px-4 py-2"
+                                variant="secondary"
+                            >
+                                {{ t('pricing.coming_soon') }}
+                            </Badge>
+                            <div
+                                class="mb-2 text-5xl font-extrabold sm:text-6xl"
+                            >
+                                700 LE
+                            </div>
+                            <div
+                                class="mb-8 text-base text-muted-foreground sm:text-lg"
+                            >
+                                {{ t('pricing.per_month') }}
+                            </div>
+
+                            <div class="mb-8 space-y-4">
+                                <div
+                                    v-for="(feature, index) in pricingFeatures"
+                                    :key="index"
+                                    class="flex items-center gap-3 text-left"
+                                >
+                                    <div
+                                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10"
+                                    >
+                                        <CheckCircle2
+                                            class="h-5 w-5 text-primary"
+                                        />
+                                    </div>
+                                    <span class="text-sm sm:text-base">{{
+                                            feature
+                                        }}</span>
+                                </div>
+                            </div>
+
+                            <Link href="/register">
+                                <Button
+                                    class="w-full shadow-lg transition-all hover:shadow-xl"
+                                    size="lg"
+                                >
+                                    {{ t('pricing.start_trial') }}
+                                </Button>
+                            </Link>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </section>
 
         <!-- CTA Section -->
         <section
-            class="border-t bg-primary py-12 text-primary-foreground md:py-16"
+            class="bg-gradient-to-br from-green-600 via-emerald-600 to-teal-600 py-16 text-white sm:py-20 lg:py-24"
         >
-            <div class="container mx-auto px-4 text-center">
-                <h2 class="mb-4 text-2xl font-bold md:text-3xl">
-                    Ready to Get Started?
+            <div
+                class="container mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8"
+            >
+                <h2
+                    class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl"
+                >
+                    {{ t('cta.title') }}
                 </h2>
-                <p class="mb-6 text-base opacity-90 md:mb-8 md:text-lg">
-                    Join hundreds of businesses using BulkWhatsApp to reach
-                    their customers.
+                <p class="mb-8 text-base opacity-90 sm:text-lg md:text-xl">
+                    {{ t('cta.description') }}
                 </p>
                 <Link href="/register">
-                    <Button class="gap-2" size="lg" variant="secondary">
-                        Create Free Account
-                        <ArrowRight class="h-4 w-4" />
+                    <Button
+                        class="group gap-2 bg-white text-green-600 shadow-xl transition-all hover:bg-white/90 hover:shadow-2xl"
+                        size="lg"
+                    >
+                        {{ t('cta.create_account') }}
+                        <ArrowRight
+                            class="h-4 w-4 transition-transform group-hover:translate-x-1"
+                        />
                     </Button>
                 </Link>
             </div>
         </section>
 
         <!-- Footer -->
-        <footer class="border-t py-6 md:py-8">
+        <footer class="border-t py-8 sm:py-12">
             <div
-                class="container mx-auto px-4 text-center text-sm text-muted-foreground"
+                class="container mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8"
             >
-                <p>&copy; 2025 BulkWhatsApp. All rights reserved.</p>
+                <p class="text-sm text-muted-foreground">
+                    {{ t('footer.copyright') }}
+                </p>
             </div>
         </footer>
     </div>

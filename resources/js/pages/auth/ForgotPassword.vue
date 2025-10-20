@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { login } from '@/routes';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
@@ -13,14 +14,16 @@ import { LoaderCircle } from 'lucide-vue-next';
 defineProps<{
     status?: string;
 }>();
+
+const { t } = useTranslation();
 </script>
 
 <template>
     <AuthLayout
-        description="Enter your email to receive a password reset link"
-        title="Forgot password"
+        :description="t('auth.forgot_password_description')"
+        :title="t('auth.forgot_password_title')"
     >
-        <Head title="Forgot password" />
+        <Head :title="t('auth.forgot_password_title')" />
 
         <div
             v-if="status"
@@ -35,13 +38,13 @@ defineProps<{
                 v-bind="PasswordResetLinkController.store.form()"
             >
                 <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
+                    <Label for="email">{{ t('auth.email_required') }}</Label>
                     <Input
                         id="email"
                         autocomplete="off"
                         autofocus
                         name="email"
-                        placeholder="email@example.com"
+                        :placeholder="t('auth.email_placeholder')"
                         type="email"
                     />
                     <InputError :message="errors.email" />
@@ -52,19 +55,20 @@ defineProps<{
                         :disabled="processing"
                         class="w-full"
                         data-test="email-password-reset-link-button"
+                        variant="default"
                     >
                         <LoaderCircle
                             v-if="processing"
                             class="h-4 w-4 animate-spin"
                         />
-                        Email password reset link
+                        {{ processing ? t('auth.sending') : t('auth.send_reset_link') }}
                     </Button>
                 </div>
             </Form>
 
             <div class="space-x-1 text-center text-sm text-muted-foreground">
-                <span>Or, return to</span>
-                <TextLink :href="login()">log in</TextLink>
+                <span>{{ t('auth.return_to_login') }}</span>
+                <TextLink :href="login()">{{ t('auth.log_in') }}</TextLink>
             </div>
         </div>
     </AuthLayout>
