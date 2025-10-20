@@ -314,3 +314,64 @@ const getCampaignProgress = (campaign: Campaign): number => {
                                                         class="h-full bg-primary transition-all"
                                                         :style="{ width: `${getCampaignProgress(campaign)}%` }"
                                                     />
+                                                </div>
+                                                <span class="text-xs text-muted-foreground">
+                                                    {{ getCampaignProgress(campaign) }}%
+                                                </span>
+                                            </div>
+
+                                            <p class="text-xs text-muted-foreground">
+                                                {{ campaign.created_at }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        class="h-8 w-8 shrink-0"
+                                        @click="viewCampaign(campaign.id)"
+                                    >
+                                        <Eye class="h-4 w-4" />
+                                        <span class="sr-only">{{ t('common.view') }}</span>
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div v-if="campaigns.length === 0" class="p-8 text-center">
+                                <Send class="mx-auto h-12 w-12 text-muted-foreground" />
+                                <p class="mt-2 text-sm text-muted-foreground">
+                                    {{ t('segments.no_campaigns') }}
+                                </p>
+                                <Link href="/campaigns/create" class="mt-4 inline-block">
+                                    <Button size="sm">
+                                        {{ t('segments.create_campaign') }}
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </AppLayout>
+</template>
+
+<style scoped>
+/* Cairo font for Arabic */
+:root[dir="rtl"] {
+    font-family: 'Cairo', sans-serif;
+}
+
+/* Inter font for English */
+:root[dir="ltr"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Smooth transitions */
+* {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+</style>
