@@ -354,7 +354,12 @@
         "no_recipients_desc": "تحتاج إلى استيراد جهات الاتصال أو إضافة جهات اتصال فردية قبل إنشاء حملة.",
         "add_contact": "إضافة جهة اتصال",
         "total_recipients": "إجمالي المستلمين",
-        "selection_type": "نوع الاختيار"
+        "selection_type": "نوع الاختيار",
+        "status_sent": "تم الإرسال",
+        "status_queued": "قيد التشغيل",
+        "start": "بدأ"
+
+
     },
     "segments": {
         "title": "الشرائح",
