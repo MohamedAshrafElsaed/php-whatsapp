@@ -19,9 +19,6 @@ use Inertia\Inertia;
 
 class CampaignController extends Controller
 {
-    /**
-     * Display campaigns list
-     */
     public function index(Request $request)
     {
         $campaigns = Campaign::with(['waSession', 'import'])
@@ -51,13 +48,10 @@ class CampaignController extends Controller
         ]);
     }
 
-    /**
-     * Store new campaign
-     * @throws \Throwable
-     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // Base validation rules
+        $rules = [
             'name' => 'required|string|max:255',
             'wa_session_id' => 'required|exists:wa_sessions,id',
             'selection_type' => ['required', Rule::in(['import', 'segment', 'contacts'])],
@@ -66,35 +60,54 @@ class CampaignController extends Controller
             'recipient_ids' => 'nullable|required_if:selection_type,contacts|array|min:1',
             'recipient_ids.*' => 'exists:recipients,id',
 
-            // Message type and content
             'message_type' => ['required', Rule::in(['text', 'image', 'video', 'audio', 'file', 'link', 'location', 'contact', 'poll'])],
-            'message_template' => 'required_if:message_type,text|nullable|string|max:4096',
-
-            // Media fields
-            'media' => 'required_if:message_type,image,video,audio,file|nullable|file|max:102400',
-            'caption' => 'nullable|string|max:1024',
-
-            // Link fields
-            'link_url' => 'required_if:message_type,link|nullable|url|max:2048',
-
-            // Location fields
-            'latitude' => 'required_if:message_type,location|nullable|numeric|between:-90,90',
-            'longitude' => 'required_if:message_type,location|nullable|numeric|between:-180,180',
-
-            // Contact fields
-            'contact_name' => 'required_if:message_type,contact|nullable|string|max:255',
-            'contact_phone' => 'required_if:message_type,contact|nullable|string|max:50',
-
-            // Poll fields
-            'poll_question' => 'required_if:message_type,poll|nullable|string|max:255',
-            'poll_options' => 'required_if:message_type,poll|nullable|array|min:2|max:12',
-            'poll_options.*' => 'required|string|max:100',
-            'poll_max_answer' => 'nullable|integer|min:1',
-
             'messages_per_minute' => 'nullable|integer|min:5|max:30',
             'delay_seconds' => 'nullable|integer|min:2|max:10',
             'start_immediately' => 'nullable|boolean',
-        ]);
+        ];
+
+        // Add conditional validation based on message_type
+        $messageType = $request->input('message_type');
+
+        switch ($messageType) {
+            case 'text':
+                $rules['message_template'] = 'required|string|max:4096';
+                break;
+
+            case 'image':
+            case 'video':
+            case 'audio':
+            case 'file':
+                $rules['media'] = 'required|file|max:102400';
+                if (in_array($messageType, ['image', 'video', 'file'])) {
+                    $rules['caption'] = 'nullable|string|max:1024';
+                }
+                break;
+
+            case 'link':
+                $rules['link_url'] = 'required|url|max:2048';
+                $rules['caption'] = 'nullable|string|max:1024';
+                break;
+
+            case 'location':
+                $rules['latitude'] = 'required|numeric|between:-90,90';
+                $rules['longitude'] = 'required|numeric|between:-180,180';
+                break;
+
+            case 'contact':
+                $rules['contact_name'] = 'required|string|max:255';
+                $rules['contact_phone'] = 'required|string|max:50';
+                break;
+
+            case 'poll':
+                $rules['poll_question'] = 'required|string|max:255';
+                $rules['poll_options'] = 'required|array|min:2|max:12';
+                $rules['poll_options.*'] = 'required|string|max:100';
+                $rules['poll_max_answer'] = 'nullable|integer|min:1';
+                break;
+        }
+
+        $validated = $request->validate($rules);
 
         // Verify the WhatsApp session belongs to user and is connected
         $waSession = WaSession::where('id', $validated['wa_session_id'])
@@ -109,14 +122,12 @@ class CampaignController extends Controller
 
         // Determine recipients based on selection type
         if ($validated['selection_type'] === 'import') {
-            // Validate import belongs to user
             $import = Import::where('id', $validated['import_id'])
                 ->where('user_id', $request->user()->id)
                 ->firstOrFail();
 
             $importId = $import->id;
 
-            // Get valid recipient IDs from import
             $recipientIds = Recipient::where('import_id', $import->id)
                 ->where('user_id', $request->user()->id)
                 ->where('is_valid', true)
@@ -126,17 +137,15 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->withErrors(['error' => 'This import has no valid recipients.']);
+                return back()->withErrors(['error' => 'This import has no valid recipients.'])->withInput();
             }
         } elseif ($validated['selection_type'] === 'segment') {
-            // Validate segment belongs to user
             $segment = Segment::where('id', $validated['segment_id'])
                 ->where('user_id', $request->user()->id)
                 ->firstOrFail();
 
             $segmentId = $segment->id;
 
-            // Get valid recipient IDs from segment
             $recipientIds = $segment->recipients()
                 ->where('is_valid', true)
                 ->pluck('recipients.id')
@@ -145,10 +154,9 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->withErrors(['error' => 'This segment has no valid recipients.']);
+                return back()->withErrors(['error' => 'This segment has no valid recipients.'])->withInput();
             }
         } else {
-            // Validate selected contacts belong to user
             $recipientIds = Recipient::whereIn('id', $validated['recipient_ids'])
                 ->where('user_id', $request->user()->id)
                 ->where('is_valid', true)
@@ -158,14 +166,12 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->withErrors(['error' => 'No valid recipients selected.']);
+                return back()->withErrors(['error' => 'No valid recipients selected.'])->withInput();
             }
         }
 
         DB::beginTransaction();
         try {
-
-            // Handle media upload
             $mediaPath = null;
             $mediaFilename = null;
             $mediaMimeType = null;
@@ -177,8 +183,6 @@ class CampaignController extends Controller
                 $mediaMimeType = $file->getMimeType();
             }
 
-
-            // Create campaign
             $campaign = Campaign::create([
                 'user_id' => $request->user()->id,
                 'wa_session_id' => $waSession->id,
@@ -186,28 +190,22 @@ class CampaignController extends Controller
                 'segment_id' => $segmentId,
                 'name' => $validated['name'],
 
-                // Message content
                 'message_type' => $validated['message_type'],
                 'message_template' => $validated['message_template'] ?? null,
 
-                // Media
                 'media_path' => $mediaPath,
                 'media_filename' => $mediaFilename,
                 'media_mime_type' => $mediaMimeType,
                 'caption' => $validated['caption'] ?? null,
 
-                // Link
                 'link_url' => $validated['link_url'] ?? null,
 
-                // Location
                 'latitude' => $validated['latitude'] ?? null,
                 'longitude' => $validated['longitude'] ?? null,
 
-                // Contact
                 'contact_name' => $validated['contact_name'] ?? null,
                 'contact_phone' => $validated['contact_phone'] ?? null,
 
-                // Poll
                 'poll_question' => $validated['poll_question'] ?? null,
                 'poll_options' => $validated['poll_options'] ?? null,
                 'poll_max_answer' => $validated['poll_max_answer'] ?? 1,
@@ -227,7 +225,6 @@ class CampaignController extends Controller
                 ],
             ]);
 
-            // Create message records for all recipients
             $this->createMessageRecords($campaign, $recipientIds);
 
             DB::commit();
@@ -241,7 +238,6 @@ class CampaignController extends Controller
                 'start_immediately' => $validated['start_immediately'] ?? false,
             ]);
 
-            // If start immediately, dispatch jobs
             if ($validated['start_immediately']) {
                 $this->dispatchCampaignJobs($campaign);
 
@@ -255,7 +251,6 @@ class CampaignController extends Controller
         } catch (Exception $e) {
             DB::rollBack();
 
-            // Delete uploaded file if campaign creation failed
             if (isset($mediaPath) && $mediaPath && Storage::disk('public')->exists($mediaPath)) {
                 Storage::disk('public')->delete($mediaPath);
             }
@@ -270,12 +265,8 @@ class CampaignController extends Controller
         }
     }
 
-    /**
-     * Show create campaign form
-     */
     public function create(Request $request)
     {
-        // Get user's connected WhatsApp devices
         $connectedDevices = WaSession::where('user_id', $request->user()->id)
             ->where('status', 'connected')
             ->orderBy('is_primary', 'desc')
@@ -293,7 +284,6 @@ class CampaignController extends Controller
                 ->with('error', 'Please connect a WhatsApp device first before creating a campaign.');
         }
 
-        // Get user's imports with valid recipients
         $imports = Import::where('user_id', $request->user()->id)
             ->where('valid_rows', '>', 0)
             ->orderBy('created_at', 'desc')
@@ -305,7 +295,6 @@ class CampaignController extends Controller
                 'created_at' => $import->created_at->format('M d, Y'),
             ]);
 
-        // Get user's segments
         $segments = Segment::where('user_id', $request->user()->id)
             ->where('valid_contacts', '>', 0)
             ->orderBy('created_at', 'desc')
@@ -317,7 +306,6 @@ class CampaignController extends Controller
                 'valid_contacts' => $segment->valid_contacts,
             ]);
 
-        // Get user's individual contacts (not tied to any specific import)
         $contacts = Recipient::where('user_id', $request->user()->id)
             ->where('is_valid', true)
             ->orderBy('first_name')
@@ -330,12 +318,10 @@ class CampaignController extends Controller
                 'email' => $recipient->email,
             ]);
 
-        // Get preview recipient (first valid recipient from user)
         $previewRecipient = Recipient::where('user_id', $request->user()->id)
             ->where('is_valid', true)
             ->first();
 
-        // Get available variables from all recipients' extra fields
         $availableVariables = ['first_name', 'last_name', 'email', 'phone'];
 
         $extraKeys = Recipient::where('user_id', $request->user()->id)
@@ -365,26 +351,19 @@ class CampaignController extends Controller
         ]);
     }
 
-    /**
-     * Create message records for campaign recipients
-     */
     private function createMessageRecords(Campaign $campaign, array $recipientIds): void
     {
         $recipients = Recipient::whereIn('id', $recipientIds)->get();
 
         $messageData = [];
         foreach ($recipients as $recipient) {
-            // For text messages and captions, render with recipient variables
             $renderedBody = null;
 
             if ($campaign->message_type === 'text') {
-                // Render text message template
                 $renderedBody = $this->renderMessageTemplate($campaign->message_template ?? '', $recipient);
             } elseif (in_array($campaign->message_type, ['image', 'video', 'file', 'link']) && $campaign->caption) {
-                // Render caption with variables
                 $renderedBody = $this->renderMessageTemplate($campaign->caption, $recipient);
             } else {
-                // For other types (audio, location, contact, poll), use a placeholder
                 $renderedBody = $this->getMessageTypePlaceholder($campaign);
             }
 
@@ -401,13 +380,31 @@ class CampaignController extends Controller
             ];
         }
 
-        // Bulk insert messages
         Message::insert($messageData);
     }
 
-    /**
-     * Get placeholder for non-text message types
-     */
+    private function renderMessageTemplate(?string $template, Recipient $recipient): string
+    {
+        if (!$template) {
+            return '';
+        }
+
+        $rendered = $template;
+
+        $rendered = str_replace('{{first_name}}', $recipient->first_name ?? '', $rendered);
+        $rendered = str_replace('{{last_name}}', $recipient->last_name ?? '', $rendered);
+        $rendered = str_replace('{{email}}', $recipient->email ?? '', $rendered);
+        $rendered = str_replace('{{phone}}', $recipient->phone_e164 ?? '', $rendered);
+
+        if ($recipient->extra_json) {
+            foreach ($recipient->extra_json as $key => $value) {
+                $rendered = str_replace("{{" . $key . "}}", (string)$value, $rendered);
+            }
+        }
+
+        return $rendered;
+    }
+
     private function getMessageTypePlaceholder(Campaign $campaign): string
     {
         switch ($campaign->message_type) {
@@ -432,40 +429,8 @@ class CampaignController extends Controller
         }
     }
 
-
-    /**
-     * Render message template with recipient variables
-     */
-    private function renderMessageTemplate(?string $template, Recipient $recipient): string
-    {
-        if (!$template) {
-            return '';
-        }
-
-        $rendered = $template;
-
-        // Replace standard variables
-        $rendered = str_replace('{{first_name}}', $recipient->first_name ?? '', $rendered);
-        $rendered = str_replace('{{last_name}}', $recipient->last_name ?? '', $rendered);
-        $rendered = str_replace('{{email}}', $recipient->email ?? '', $rendered);
-        $rendered = str_replace('{{phone}}', $recipient->phone_e164 ?? '', $rendered);
-
-        // Replace extra JSON variables
-        if ($recipient->extra_json) {
-            foreach ($recipient->extra_json as $key => $value) {
-                $rendered = str_replace("{{" . $key . "}}", (string)$value, $rendered);
-            }
-        }
-
-        return $rendered;
-    }
-
-    /**
-     * Dispatch campaign jobs with throttling
-     */
     private function dispatchCampaignJobs(Campaign $campaign): int
     {
-        // Get queued messages for this campaign
         $messages = Message::where('campaign_id', $campaign->id)
             ->where('status', 'queued')
             ->get();
@@ -480,7 +445,6 @@ class CampaignController extends Controller
         $throttling = $campaign->getThrottlingConfig();
         $delaySeconds = $throttling['delay_between_messages'] ?? 4;
 
-        // Dispatch jobs for each message with progressive delay
         $delay = 0;
         $dispatched = 0;
 
@@ -502,16 +466,12 @@ class CampaignController extends Controller
         return $dispatched;
     }
 
-    /**
-     * Show campaign details
-     */
     public function show(Request $request, Campaign $campaign)
     {
         $this->authorize('view', $campaign);
 
         $campaign->load(['waSession', 'import']);
 
-        // Get statistics
         $stats = [
             'total' => $campaign->total_recipients ?? 0,
             'sent' => $campaign->sent_count ?? 0,
@@ -520,7 +480,6 @@ class CampaignController extends Controller
             'progress_percentage' => $campaign->getProgressPercentage(),
         ];
 
-        // Get message history (last 50 messages)
         $messages = Message::where('campaign_id', $campaign->id)
             ->with('recipient')
             ->latest()
@@ -562,9 +521,6 @@ class CampaignController extends Controller
         ]);
     }
 
-    /**
-     * Start campaign execution
-     */
     public function start(Request $request, Campaign $campaign)
     {
         $this->authorize('update', $campaign);
@@ -573,18 +529,15 @@ class CampaignController extends Controller
             return back()->with('error', 'Cannot start this campaign. Status: ' . $campaign->status);
         }
 
-        // Verify device is still connected
         if (!$campaign->waSession || !$campaign->waSession->isConnected()) {
             return back()->with('error', 'WhatsApp device is not connected. Please connect your device first.');
         }
 
-        // Update campaign status
         $campaign->update([
             'status' => 'running',
             'started_at' => now(),
         ]);
 
-        // Dispatch jobs
         $jobsDispatched = $this->dispatchCampaignJobs($campaign);
 
         Log::info('Campaign started manually', [
@@ -596,9 +549,6 @@ class CampaignController extends Controller
         return back()->with('success', "Campaign started! Dispatched {$jobsDispatched} messages.");
     }
 
-    /**
-     * Pause campaign
-     */
     public function pause(Request $request, Campaign $campaign)
     {
         $this->authorize('update', $campaign);
@@ -617,9 +567,6 @@ class CampaignController extends Controller
         return back()->with('success', 'Campaign paused. Queued messages will not be sent.');
     }
 
-    /**
-     * Resume paused campaign
-     */
     public function resume(Request $request, Campaign $campaign)
     {
         $this->authorize('update', $campaign);
@@ -628,7 +575,6 @@ class CampaignController extends Controller
             return back()->with('error', 'Cannot resume this campaign.');
         }
 
-        // Verify device is still connected
         if (!$campaign->waSession || !$campaign->waSession->isConnected()) {
             return back()->with('error', 'WhatsApp device is not connected.');
         }
@@ -643,9 +589,6 @@ class CampaignController extends Controller
         return back()->with('success', 'Campaign resumed. Messages will continue sending.');
     }
 
-    /**
-     * Cancel campaign
-     */
     public function cancel(Request $request, Campaign $campaign)
     {
         $this->authorize('update', $campaign);
@@ -669,9 +612,6 @@ class CampaignController extends Controller
         return back()->with('success', 'Campaign cancelled. No more messages will be sent.');
     }
 
-    /**
-     * Delete campaign
-     */
     public function destroy(Request $request, Campaign $campaign)
     {
         $this->authorize('delete', $campaign);

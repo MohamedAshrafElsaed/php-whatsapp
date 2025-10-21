@@ -531,7 +531,7 @@
         "creating": "Creating...",
         "sending": "Sending...",
         "send": "Send",
-        "optional": "optional"
-
+        "optional": "optional",
+        "error": "something went wrong"
     }
 }

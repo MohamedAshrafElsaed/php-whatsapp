@@ -14,6 +14,7 @@ interface Campaign {
     id: number;
     name: string;
     status: 'draft' | 'running' | 'paused' | 'canceled' | 'finished';
+    selection_type: 'import' | 'segment' | 'contacts';
     message_template: string;
     throttling: {
         messages_per_minute: number;
@@ -26,7 +27,7 @@ interface Campaign {
         id: number;
         filename: string;
         valid_rows: number;
-    };
+    } | null;
 }
 
 interface Stats {
@@ -34,6 +35,7 @@ interface Stats {
     sent: number;
     failed: number;
     queued: number;
+    progress_percentage: number;
 }
 
 interface Message {
@@ -113,8 +115,7 @@ const refreshPage = () => {
 };
 
 const getProgressPercentage = () => {
-    if (props.stats.total === 0) return 0;
-    return Math.round((props.stats.sent / props.stats.total) * 100);
+    return props.stats.progress_percentage || 0;
 };
 
 const formatDate = (dateString: string) => {
@@ -125,6 +126,15 @@ const formatDate = (dateString: string) => {
         hour: '2-digit',
         minute: '2-digit',
     });
+};
+
+const getSelectionTypeLabel = () => {
+    const labels = {
+        'import': t('campaigns.from_import'),
+        'segment': t('campaigns.from_segment'),
+        'contacts': t('campaigns.individual_contacts')
+    };
+    return labels[props.campaign.selection_type] || t('campaigns.recipients');
 };
 </script>
 
@@ -313,7 +323,7 @@ const formatDate = (dateString: string) => {
                             </div>
                             <div class="rounded-lg bg-muted p-4">
                                 <p class="whitespace-pre-wrap break-words text-sm">
-                                    {{ campaign.message_template }}
+                                    {{ campaign.message_template || '[No template]' }}
                                 </p>
                             </div>
                         </div>
@@ -331,13 +341,16 @@ const formatDate = (dateString: string) => {
                             <dl class="space-y-4">
                                 <div>
                                     <dt class="text-sm font-medium text-muted-foreground">
-                                        {{ t('campaigns.import_file') }}
+                                        {{ t('campaigns.recipient_source') }}
                                     </dt>
                                     <dd class="mt-1 break-words font-medium">
-                                        {{ campaign.import.filename }}
+                                        {{ getSelectionTypeLabel() }}
                                     </dd>
-                                    <dd class="mt-0.5 text-sm text-muted-foreground">
-                                        {{ campaign.import.valid_rows }} {{ t('campaigns.recipients') }}
+                                    <dd v-if="campaign.import" class="mt-0.5 text-sm text-muted-foreground">
+                                        {{ campaign.import.filename }} ({{ campaign.import.valid_rows }} {{ t('campaigns.recipients') }})
+                                    </dd>
+                                    <dd v-else class="mt-0.5 text-sm text-muted-foreground">
+                                        {{ stats.total }} {{ t('campaigns.recipients') }}
                                     </dd>
                                 </div>
                                 <div>
@@ -477,17 +490,14 @@ const formatDate = (dateString: string) => {
 </template>
 
 <style scoped>
-/* Cairo font for Arabic */
 :root[dir="rtl"] {
     font-family: 'Cairo', sans-serif;
 }
 
-/* Inter font for English */
 :root[dir="ltr"] {
     font-family: 'Inter', sans-serif;
 }
 
-/* Ensure proper text alignment in RTL */
 [dir="rtl"] .text-start {
     text-align: right;
 }
@@ -496,7 +506,6 @@ const formatDate = (dateString: string) => {
     text-align: left;
 }
 
-/* Smooth transitions */
 * {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
