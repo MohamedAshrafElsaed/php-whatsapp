@@ -59,8 +59,6 @@ class CampaignController extends Controller
             'import_id' => 'nullable|required_if:selection_type,import|exists:imports,id',
             'segment_id' => 'nullable|required_if:selection_type,segment|exists:segments,id',
             'recipient_ids' => 'nullable|required_if:selection_type,contacts|array|min:1',
-            'recipient_ids.*' => 'exists:recipients,id',
-
             'message_type' => ['required', Rule::in(['text', 'image', 'video', 'audio', 'file', 'link', 'location', 'contact', 'poll'])],
             'messages_per_minute' => 'nullable|integer|min:5|max:30',
             'delay_seconds' => 'nullable|integer|min:2|max:10',
