@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Campaign;
 use App\Models\Message;
-use App\Models\Recipient;
 use App\Services\BridgeManager;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -55,10 +54,11 @@ class SendCampaignMessageJob implements ShouldQueue
             return;
         }
 
-        // Check campaign status
-        if (!in_array($campaign->status, ['running'])) {
+        // Check campaign status - allow running campaigns only
+        if ($campaign->status !== 'running') {
             Log::info('Campaign not running, skipping message', [
                 'message_id' => $this->messageId,
+                'campaign_id' => $campaign->id,
                 'campaign_status' => $campaign->status,
             ]);
             return;
@@ -70,6 +70,7 @@ class SendCampaignMessageJob implements ShouldQueue
             Log::error('WhatsApp session not connected', [
                 'message_id' => $this->messageId,
                 'campaign_id' => $campaign->id,
+                'wa_session_id' => $campaign->wa_session_id,
             ]);
             $message->update([
                 'status' => 'failed',
@@ -77,6 +78,7 @@ class SendCampaignMessageJob implements ShouldQueue
                 'error_message' => 'WhatsApp session is not connected',
             ]);
             $campaign->increment('failed_count');
+            $this->checkCampaignCompletion($campaign);
             return;
         }
 
@@ -127,6 +129,8 @@ class SendCampaignMessageJob implements ShouldQueue
             $message->update([
                 'status' => 'sent',
                 'sent_at' => now(),
+                'error_code' => null,
+                'error_message' => null,
             ]);
 
             $campaign->increment('sent_count');
@@ -163,6 +167,10 @@ class SendCampaignMessageJob implements ShouldQueue
      */
     private function sendTextMessage($bridge, Message $message, Campaign $campaign): void
     {
+        if (!$message->body_rendered) {
+            throw new \Exception('Message body is empty');
+        }
+
         $bridge->sendMessage(
             $message->phone_e164,
             $message->body_rendered
@@ -174,19 +182,27 @@ class SendCampaignMessageJob implements ShouldQueue
      */
     private function sendMediaMessage($bridge, Message $message, Campaign $campaign): void
     {
-        if (!$campaign->media_path || !Storage::disk('public')->exists($campaign->media_path)) {
-            throw new \Exception('Media file not found');
+        if (!$campaign->media_path) {
+            throw new \Exception('Media path is not set');
+        }
+
+        if (!Storage::disk('public')->exists($campaign->media_path)) {
+            throw new \Exception('Media file not found: ' . $campaign->media_path);
         }
 
         $fileContents = Storage::disk('public')->get($campaign->media_path);
+
+        if (!$fileContents) {
+            throw new \Exception('Failed to read media file');
+        }
+
         $fileName = $campaign->media_filename ?? 'file';
 
         // Use per-recipient rendered caption if available (stored in body_rendered)
         // Otherwise fall back to campaign caption
         $caption = '';
-        if (in_array($campaign->message_type, ['image', 'video', 'file']) && $campaign->caption) {
-            // If body_rendered contains the rendered caption, use it
-            $caption = $message->body_rendered ?? $campaign->caption;
+        if (in_array($campaign->message_type, ['image', 'video', 'file'])) {
+            $caption = $message->body_rendered ?? $campaign->caption ?? '';
         }
 
         switch ($campaign->message_type) {
@@ -265,6 +281,10 @@ class SendCampaignMessageJob implements ShouldQueue
             throw new \Exception('Poll question and options are required');
         }
 
+        if (!is_array($campaign->poll_options) || count($campaign->poll_options) < 2) {
+            throw new \Exception('Poll must have at least 2 options');
+        }
+
         $bridge->sendPoll(
             $message->phone_e164,
             $campaign->poll_question,
@@ -279,6 +299,11 @@ class SendCampaignMessageJob implements ShouldQueue
     private function checkCampaignCompletion(Campaign $campaign): void
     {
         $campaign = $campaign->fresh();
+
+        if (!$campaign) {
+            Log::error('Campaign not found when checking completion');
+            return;
+        }
 
         $totalProcessed = $campaign->sent_count + $campaign->failed_count;
 
@@ -310,20 +335,35 @@ class SendCampaignMessageJob implements ShouldQueue
 
         try {
             $message = Message::find($this->messageId);
-            if ($message) {
-                $message->update([
-                    'status' => 'failed',
-                    'error_code' => 'JOB_FAILED',
-                    'error_message' => substr($exception->getMessage(), 0, 500),
-                ]);
 
-                if ($message->campaign) {
-                    $message->campaign->increment('failed_count');
-                }
+            if (!$message) {
+                Log::error('Cannot update failed message - message not found', [
+                    'message_id' => $this->messageId,
+                ]);
+                return;
+            }
+
+            $message->update([
+                'status' => 'failed',
+                'error_code' => 'JOB_FAILED',
+                'error_message' => substr($exception->getMessage(), 0, 500),
+            ]);
+
+            $campaign = $message->campaign;
+
+            if ($campaign) {
+                $campaign->increment('failed_count');
+                $this->checkCampaignCompletion($campaign);
+            } else {
+                Log::warning('Campaign not found when handling job failure', [
+                    'message_id' => $this->messageId,
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('Failed to handle job failure', [
+                'message_id' => $this->messageId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }

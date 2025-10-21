@@ -21,7 +21,7 @@ class CampaignController extends Controller
 {
     public function index(Request $request)
     {
-        $campaigns = Campaign::with(['waSession', 'import'])
+        $campaigns = Campaign::with(['waSession', 'import', 'segment'])
             ->where('user_id', $request->user()->id)
             ->orderBy('created_at', 'desc')
             ->paginate(20)
@@ -29,9 +29,10 @@ class CampaignController extends Controller
                 'id' => $campaign->id,
                 'name' => $campaign->name,
                 'status' => $campaign->status,
+                'message_type' => $campaign->message_type,
                 'created_at' => $campaign->created_at->format('M d, Y'),
                 'import' => [
-                    'filename' => $campaign->import?->filename ?? 'N/A',
+                    'filename' => $campaign->import?->filename ?? ($campaign->segment?->name ?? 'N/A'),
                 ],
                 'total_messages' => $campaign->total_recipients ?? 0,
                 'sent_count' => $campaign->sent_count ?? 0,
@@ -75,13 +76,22 @@ class CampaignController extends Controller
                 break;
 
             case 'image':
+                $rules['media'] = 'required|file|mimes:jpg,jpeg,png,gif,webp|max:10240';
+                $rules['caption'] = 'nullable|string|max:1024';
+                break;
+
             case 'video':
+                $rules['media'] = 'required|file|mimes:mp4,avi,mov,mkv|max:102400';
+                $rules['caption'] = 'nullable|string|max:1024';
+                break;
+
             case 'audio':
+                $rules['media'] = 'required|file|mimes:mp3,wav,ogg,m4a,aac|max:10240';
+                break;
+
             case 'file':
                 $rules['media'] = 'required|file|max:102400';
-                if (in_array($messageType, ['image', 'video', 'file'])) {
-                    $rules['caption'] = 'nullable|string|max:1024';
-                }
+                $rules['caption'] = 'nullable|string|max:1024';
                 break;
 
             case 'link':
@@ -178,8 +188,19 @@ class CampaignController extends Controller
 
             if ($request->hasFile('media')) {
                 $file = $request->file('media');
-                $mediaFilename = time() . '_' . $file->getClientOriginalName();
+
+                // Validate file was uploaded successfully
+                if (!$file->isValid()) {
+                    throw new \Exception('File upload failed');
+                }
+
+                $mediaFilename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
                 $mediaPath = $file->storeAs('campaign_media', $mediaFilename, 'public');
+
+                if (!$mediaPath) {
+                    throw new \Exception('Failed to store media file');
+                }
+
                 $mediaMimeType = $file->getMimeType();
             }
 
@@ -210,14 +231,14 @@ class CampaignController extends Controller
                 'poll_options' => $validated['poll_options'] ?? null,
                 'poll_max_answer' => $validated['poll_max_answer'] ?? 1,
 
-                'status' => $validated['start_immediately'] ? 'running' : 'draft',
+                'status' => $validated['start_immediately'] ?? false ? 'running' : 'draft',
                 'total_recipients' => $recipientsCount,
                 'sent_count' => 0,
                 'failed_count' => 0,
-                'started_at' => $validated['start_immediately'] ? now() : null,
+                'started_at' => $validated['start_immediately'] ?? false ? now() : null,
                 'throttling_cfg_json' => [
                     'messages_per_minute' => $validated['messages_per_minute'] ?? 15,
-                    'delay_seconds' => $validated['delay_seconds'] ?? 4,
+                    'delay_between_messages' => $validated['delay_seconds'] ?? 4,
                 ],
                 'settings_json' => [
                     'selection_type' => $validated['selection_type'],
@@ -234,12 +255,13 @@ class CampaignController extends Controller
                 'user_id' => $request->user()->id,
                 'wa_session_id' => $waSession->id,
                 'selection_type' => $validated['selection_type'],
+                'message_type' => $validated['message_type'],
                 'total_recipients' => $recipientsCount,
                 'start_immediately' => $validated['start_immediately'] ?? false,
             ]);
 
-            if ($validated['start_immediately']) {
-                $this->dispatchCampaignJobs($campaign);
+            if ($validated['start_immediately'] ?? false) {
+                $jobsDispatched = $this->dispatchCampaignJobs($campaign);
 
                 return redirect()->route('campaigns.show', $campaign)
                     ->with('success', "Campaign started! Sending {$recipientsCount} messages...");
@@ -270,6 +292,7 @@ class CampaignController extends Controller
         $connectedDevices = WaSession::where('user_id', $request->user()->id)
             ->where('status', 'connected')
             ->orderBy('is_primary', 'desc')
+            ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn($session) => [
                 'id' => $session->id,
@@ -380,7 +403,11 @@ class CampaignController extends Controller
             ];
         }
 
-        Message::insert($messageData);
+        // Insert in chunks for large campaigns
+        $chunks = array_chunk($messageData, 500);
+        foreach ($chunks as $chunk) {
+            Message::insert($chunk);
+        }
     }
 
     private function renderMessageTemplate(?string $template, Recipient $recipient): string
@@ -442,7 +469,7 @@ class CampaignController extends Controller
             return 0;
         }
 
-        $throttling = $campaign->getThrottlingConfig();
+        $throttling = $campaign->throttling_cfg_json ?? [];
         $delaySeconds = $throttling['delay_between_messages'] ?? 4;
 
         $delay = 0;
@@ -470,14 +497,16 @@ class CampaignController extends Controller
     {
         $this->authorize('view', $campaign);
 
-        $campaign->load(['waSession', 'import']);
+        $campaign->load(['waSession', 'import', 'segment']);
 
         $stats = [
             'total' => $campaign->total_recipients ?? 0,
             'sent' => $campaign->sent_count ?? 0,
             'failed' => $campaign->failed_count ?? 0,
             'queued' => max(0, ($campaign->total_recipients ?? 0) - ($campaign->sent_count ?? 0) - ($campaign->failed_count ?? 0)),
-            'progress_percentage' => $campaign->getProgressPercentage(),
+            'progress_percentage' => $campaign->total_recipients > 0
+                ? round((($campaign->sent_count + $campaign->failed_count) / $campaign->total_recipients) * 100, 2)
+                : 0,
         ];
 
         $messages = Message::where('campaign_id', $campaign->id)
@@ -492,6 +521,7 @@ class CampaignController extends Controller
                 'status' => $message->status,
                 'sent_at' => $message->sent_at?->format('M d, Y H:i:s'),
                 'error_message' => $message->error_message,
+                'error_code' => $message->error_code,
             ]);
 
         $selectionType = $campaign->settings_json['selection_type'] ?? 'import';
@@ -501,11 +531,13 @@ class CampaignController extends Controller
                 'id' => $campaign->id,
                 'name' => $campaign->name,
                 'status' => $campaign->status,
+                'message_type' => $campaign->message_type,
                 'selection_type' => $selectionType,
                 'message_template' => $campaign->message_template,
+                'caption' => $campaign->caption,
                 'throttling' => $campaign->throttling_cfg_json ?? [
                         'messages_per_minute' => 15,
-                        'delay_seconds' => 4,
+                        'delay_between_messages' => 4,
                     ],
                 'started_at' => $campaign->started_at?->format('M d, Y H:i:s'),
                 'finished_at' => $campaign->finished_at?->format('M d, Y H:i:s'),
@@ -514,6 +546,11 @@ class CampaignController extends Controller
                     'id' => $campaign->import->id,
                     'filename' => $campaign->import->filename,
                     'valid_rows' => $campaign->import->valid_rows,
+                ] : null,
+                'segment' => $campaign->segment ? [
+                    'id' => $campaign->segment->id,
+                    'name' => $campaign->segment->name,
+                    'valid_contacts' => $campaign->segment->valid_contacts,
                 ] : null,
             ],
             'stats' => $stats,
@@ -525,7 +562,7 @@ class CampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        if (!$campaign->canStart()) {
+        if (!in_array($campaign->status, ['draft', 'paused'])) {
             return back()->with('error', 'Cannot start this campaign. Status: ' . $campaign->status);
         }
 
@@ -535,7 +572,7 @@ class CampaignController extends Controller
 
         $campaign->update([
             'status' => 'running',
-            'started_at' => now(),
+            'started_at' => $campaign->started_at ?? now(),
         ]);
 
         $jobsDispatched = $this->dispatchCampaignJobs($campaign);
@@ -553,8 +590,8 @@ class CampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        if (!$campaign->canPause()) {
-            return back()->with('error', 'Cannot pause this campaign.');
+        if ($campaign->status !== 'running') {
+            return back()->with('error', 'Cannot pause this campaign. Current status: ' . $campaign->status);
         }
 
         $campaign->update(['status' => 'paused']);
@@ -571,8 +608,8 @@ class CampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        if (!$campaign->canResume()) {
-            return back()->with('error', 'Cannot resume this campaign.');
+        if ($campaign->status !== 'paused') {
+            return back()->with('error', 'Cannot resume this campaign. Current status: ' . $campaign->status);
         }
 
         if (!$campaign->waSession || !$campaign->waSession->isConnected()) {
@@ -581,25 +618,28 @@ class CampaignController extends Controller
 
         $campaign->update(['status' => 'running']);
 
+        $jobsDispatched = $this->dispatchCampaignJobs($campaign);
+
         Log::info('Campaign resumed', [
             'campaign_id' => $campaign->id,
             'user_id' => $request->user()->id,
+            'jobs_dispatched' => $jobsDispatched,
         ]);
 
-        return back()->with('success', 'Campaign resumed. Messages will continue sending.');
+        return back()->with('success', "Campaign resumed. Dispatched {$jobsDispatched} pending messages.");
     }
 
     public function cancel(Request $request, Campaign $campaign)
     {
         $this->authorize('update', $campaign);
 
-        if (!$campaign->canCancel()) {
-            return back()->with('error', 'Cannot cancel this campaign.');
+        if (!in_array($campaign->status, ['draft', 'running', 'paused'])) {
+            return back()->with('error', 'Cannot cancel this campaign. Current status: ' . $campaign->status);
         }
 
         $campaign->update([
             'status' => 'canceled',
-            'completed_at' => now(),
+            'finished_at' => now(),
         ]);
 
         Log::info('Campaign canceled', [
@@ -621,6 +661,12 @@ class CampaignController extends Controller
         }
 
         $campaignId = $campaign->id;
+
+        // Delete associated media file if exists
+        if ($campaign->media_path && Storage::disk('public')->exists($campaign->media_path)) {
+            Storage::disk('public')->delete($campaign->media_path);
+        }
+
         $campaign->delete();
 
         Log::info('Campaign deleted', [
