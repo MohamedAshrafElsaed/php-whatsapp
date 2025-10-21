@@ -35,7 +35,7 @@ class WaSessionController extends Controller
         $maxDevices = $this->bridgeManager->getDeviceLimit($request->user()->id);
 
         return Inertia::render('whatsapp/Connect', [
-            'connectedDevices' => $sessions->toArray(),
+            'sessions' => $sessions->isEmpty() ? [] : $sessions->toArray(),
             'maxDevices' => $maxDevices,
         ]);
     }
