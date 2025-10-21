@@ -126,7 +126,7 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->with('error', 'This import has no valid recipients.');
+                return back()->withErrors(['error' => 'This import has no valid recipients.']);
             }
         } elseif ($validated['selection_type'] === 'segment') {
             // Validate segment belongs to user
@@ -145,7 +145,7 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->with('error', 'This segment has no valid recipients.');
+                return back()->withErrors(['error' => 'This segment has no valid recipients.']);
             }
         } else {
             // Validate selected contacts belong to user
@@ -158,7 +158,7 @@ class CampaignController extends Controller
             $recipientsCount = count($recipientIds);
 
             if ($recipientsCount === 0) {
-                return back()->with('error', 'No valid recipients selected.');
+                return back()->withErrors(['error' => 'No valid recipients selected.']);
             }
         }
 
@@ -256,16 +256,17 @@ class CampaignController extends Controller
             DB::rollBack();
 
             // Delete uploaded file if campaign creation failed
-            if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+            if (isset($mediaPath) && $mediaPath && Storage::disk('public')->exists($mediaPath)) {
                 Storage::disk('public')->delete($mediaPath);
             }
 
             Log::error('Failed to create campaign', [
                 'error' => $e->getMessage(),
                 'user_id' => $request->user()->id,
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            return back()->with('error', 'Failed to create campaign: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to create campaign: ' . $e->getMessage()])->withInput();
         }
     }
 

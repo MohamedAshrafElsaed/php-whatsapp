@@ -331,7 +331,12 @@ const toggleAllContacts = (): void => {
  */
 const saveDraft = (): void => {
     form.start_immediately = false;
-    form.post('/campaigns');
+    form.post('/campaigns', {
+        preserveScroll: true,
+        onError: () => {
+            console.error('Campaign creation failed');
+        }
+    });
 };
 
 /**
@@ -339,7 +344,12 @@ const saveDraft = (): void => {
  */
 const createAndStart = (): void => {
     form.start_immediately = true;
-    form.post('/campaigns');
+    form.post('/campaigns', {
+        preserveScroll: true,
+        onError: () => {
+            console.error('Campaign creation failed');
+        }
+    });
 };
 
 /**
