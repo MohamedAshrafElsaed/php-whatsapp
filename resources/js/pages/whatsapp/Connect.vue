@@ -84,7 +84,8 @@ interface Recipient {
 }
 
 const props = defineProps<{
-    connectedDevices: WaSession[];
+    sessions: WaSession[];  // Changed from connectedDevices to sessions
+    maxDevices: number;
     imports: Import[];
     segments: Segment[];
     contacts: Contact[];
@@ -94,11 +95,9 @@ const props = defineProps<{
 
 const { t, isRTL } = useTranslation();
 
-// Replace line 100 in your Create.vue file with this:
-
 const form = useForm({
     name: '',
-    wa_session_id: (props.connectedDevices && props.connectedDevices.length > 0) ? props.connectedDevices[0].id : null,
+    wa_session_id: (props.sessions && props.sessions.length > 0) ? props.sessions[0].id : null,  // Changed to props.sessions
     selection_type: 'import' as 'import' | 'segment' | 'contacts',
     import_id: null as number | null,
     segment_id: null as number | null,
