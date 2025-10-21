@@ -1,15 +1,17 @@
 <?php
-// routes/web.php
 
+use App\Http\Controllers\AutoReplyController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeatureRequestController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SegmentController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\WaSessionController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WhatsAppGroupsController;
 use App\Http\Controllers\WhatsAppSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -40,12 +42,25 @@ Route::middleware(['auth'])->prefix('w')->name('wa.')->group(function () {
     Route::post('/session/{deviceId}/set-primary', [WaSessionController::class, 'setPrimary'])->name('session.set-primary');
     Route::delete('/session/{deviceId}', [WaSessionController::class, 'destroy'])->name('session.destroy');
 
-    Route::post('/session/{deviceId}/sync-contacts', [WaSessionController::class, 'syncContacts'])->name('wa.sync-contacts');
-
+    Route::post('/session/{deviceId}/sync-contacts', [WaSessionController::class, 'syncContacts'])->name('session.sync-contacts');
 
     Route::post('/session/{deviceId}/reconnect', [WaSessionController::class, 'reconnect'])->name('session.reconnect');
     Route::delete('/session/{deviceId}/force', [WaSessionController::class, 'forceDelete'])->name('session.force-delete');
+});
 
+// WhatsApp Groups (Coming Soon)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/whatsapp-groups', [WhatsAppGroupsController::class, 'index'])->name('whatsapp.groups');
+});
+
+// Auto Reply (Coming Soon)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/auto-reply', [AutoReplyController::class, 'index'])->name('whatsapp.auto-reply');
+});
+
+// Reports (Coming Soon)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
 });
 
 // WhatsApp Settings
@@ -100,8 +115,6 @@ Route::middleware(['auth', 'verified.phone'])->prefix('contacts')->name('contact
     Route::delete('/{recipient}', [ContactController::class, 'destroy'])->name('destroy');
 });
 
-// Campaign Routes
-
 // Campaign Management Routes
 Route::middleware(['auth'])->group(function () {
     // Campaign CRUD
@@ -144,6 +157,5 @@ Route::get('/lang/{locale}', function ($locale) {
 
     return redirect()->back();
 })->name('lang.switch');
-
 
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');

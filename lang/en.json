@@ -241,9 +241,40 @@
         "title": "Reports"
     },
     "feature_requests": {
-        "title": "Feature Requests"
+        "title": "Feature Requests",
+        "suggest_feature": "Suggest a Feature"
+    },
+    "coming_soon": {
+        "planned_features": "Planned Features",
+        "notify_message": "We're working hard to bring you this feature. Stay tuned!",
+        "groups": {
+            "description": "Manage and message WhatsApp groups directly from the platform",
+            "feature_1": "View all your WhatsApp groups in one place",
+            "feature_2": "Send bulk messages to multiple groups simultaneously",
+            "feature_3": "Schedule group messages for optimal delivery times",
+            "feature_4": "Track message delivery and read receipts per group",
+            "feature_5": "Export group member lists for contact management"
+        },
+        "auto_reply": {
+            "description": "Set up automated responses to incoming WhatsApp messages",
+            "feature_1": "Create custom auto-reply templates for different scenarios",
+            "feature_2": "Set up keyword-triggered automatic responses",
+            "feature_3": "Configure business hours with different reply messages",
+            "feature_4": "Smart AI-powered responses based on message context",
+            "feature_5": "Track auto-reply performance and engagement metrics"
+        },
+        "reports": {
+            "description": "Comprehensive analytics and reporting for your WhatsApp campaigns",
+            "feature_1": "Real-time campaign performance dashboards",
+            "feature_2": "Detailed delivery and read rate statistics",
+            "feature_3": "Contact engagement analytics and trends",
+            "feature_4": "Export reports in multiple formats (PDF, Excel, CSV)",
+            "feature_5": "Custom date range comparisons and historical data"
+        }
     },
     "campaigns": {
+        "recipient_source": "Recipient Source",
+        "delay_between_messages": "Delay Between Messages",
         "from_segment": "From Segment",
         "select_segment": "Select Segment",
         "choose_segment": "Choose a segment...",
@@ -449,6 +480,7 @@
         "no_recipients": "No recipients found"
     },
     "contacts": {
+        "never": "Never",
         "title": "All Contacts",
         "description": "Manage and send messages to your contacts",
         "add": "Add Contact",
@@ -532,6 +564,8 @@
         "sending": "Sending...",
         "send": "Send",
         "optional": "optional",
-        "error": "something went wrong"
+        "error": "something went wrong",
+        "back_to_dashboard": "Back to Dashboard"
+
     }
 }
