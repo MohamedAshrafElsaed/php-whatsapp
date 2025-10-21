@@ -16,9 +16,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useTranslation } from '@/composables/useTranslation';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import {
     AlertCircle,
     ArrowLeft,
@@ -43,6 +44,7 @@ import {
     ListChecks,
     Plus,
     X,
+    XCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
@@ -93,6 +95,7 @@ const props = defineProps<{
 }>();
 
 const { t, isRTL } = useTranslation();
+const page = usePage();
 
 const form = useForm({
     name: '',
@@ -102,26 +105,20 @@ const form = useForm({
     segment_id: null as number | null,
     recipient_ids: [] as number[],
 
-    // Message type
     message_type: 'text' as 'text' | 'image' | 'video' | 'audio' | 'file' | 'link' | 'location' | 'contact' | 'poll',
     message_template: '',
 
-    // Media
     media: null as File | null,
     caption: '',
 
-    // Link
     link_url: '',
 
-    // Location
     latitude: null as number | null,
     longitude: null as number | null,
 
-    // Contact
     contact_name: '',
     contact_phone: '',
 
-    // Poll
     poll_question: '',
     poll_options: ['', ''] as string[],
     poll_max_answer: 1,
@@ -134,9 +131,15 @@ const form = useForm({
 const contactsExpanded = ref(false);
 const searchQuery = ref('');
 
-/**
- * Filter contacts based on search query
- */
+// Get general errors from page props
+const generalErrors = computed(() => {
+    const errors = page.props.errors as any;
+    if (errors && errors.error) {
+        return Array.isArray(errors.error) ? errors.error : [errors.error];
+    }
+    return [];
+});
+
 const filteredContacts = computed((): Contact[] => {
     if (!searchQuery.value) return props.contacts;
 
@@ -149,14 +152,8 @@ const filteredContacts = computed((): Contact[] => {
     );
 });
 
-/**
- * Get count of selected contacts
- */
 const selectedContactsCount = computed((): number => form.recipient_ids.length);
 
-/**
- * Check if all filtered contacts are selected
- */
 const allContactsSelected = computed((): boolean => {
     return (
         filteredContacts.value.length > 0 &&
@@ -164,16 +161,10 @@ const allContactsSelected = computed((): boolean => {
     );
 });
 
-/**
- * Check if some but not all contacts are selected
- */
 const someContactsSelected = computed((): boolean => {
     return form.recipient_ids.length > 0 && !allContactsSelected.value;
 });
 
-/**
- * Compute preview message with variable replacements
- */
 const previewMessage = computed((): string => {
     if (form.message_type !== 'text' || !form.message_template || !props.previewRecipient) {
         return getMessageTypePreview();
@@ -206,9 +197,6 @@ const previewMessage = computed((): string => {
     return preview;
 });
 
-/**
- * Get message type preview
- */
 const getMessageTypePreview = (): string => {
     switch (form.message_type) {
         case 'text':
@@ -234,9 +222,6 @@ const getMessageTypePreview = (): string => {
     }
 };
 
-/**
- * Handle media file change
- */
 const handleMediaChange = (event: Event): void => {
     const target = event.target as HTMLInputElement;
     if (target.files && target.files[0]) {
@@ -244,34 +229,22 @@ const handleMediaChange = (event: Event): void => {
     }
 };
 
-/**
- * Add poll option
- */
 const addPollOption = (): void => {
     if (form.poll_options.length < 12) {
         form.poll_options.push('');
     }
 };
 
-/**
- * Remove poll option
- */
 const removePollOption = (index: number): void => {
     if (form.poll_options.length > 2) {
         form.poll_options.splice(index, 1);
     }
 };
 
-/**
- * Format variable for display
- */
 const formatVariable = (variable: string): string => {
     return `{{${variable}}}`;
 };
 
-/**
- * Insert variable at cursor position in textarea
- */
 const insertVariable = (variable: string): void => {
     const textarea = document.querySelector(
         'textarea[name="message_template"]',
@@ -294,9 +267,6 @@ const insertVariable = (variable: string): void => {
     }
 };
 
-/**
- * Toggle individual contact selection
- */
 const toggleContact = (contactId: number): void => {
     const index = form.recipient_ids.indexOf(contactId);
     if (index > -1) {
@@ -306,9 +276,6 @@ const toggleContact = (contactId: number): void => {
     }
 };
 
-/**
- * Toggle all filtered contacts
- */
 const toggleAllContacts = (): void => {
     if (allContactsSelected.value) {
         filteredContacts.value.forEach((contact) => {
@@ -326,78 +293,42 @@ const toggleAllContacts = (): void => {
     }
 };
 
-/**
- * Save campaign as draft
- */
 const saveDraft = (): void => {
     form.start_immediately = false;
     form.post('/campaigns', {
         preserveScroll: true,
-        onError: () => {
-            console.error('Campaign creation failed');
-        }
     });
 };
 
-/**
- * Create and start campaign immediately
- */
 const createAndStart = (): void => {
     form.start_immediately = true;
     form.post('/campaigns', {
         preserveScroll: true,
-        onError: () => {
-            console.error('Campaign creation failed');
-        }
     });
 };
 
-/**
- * Get selected import details
- */
 const selectedImport = computed(() => {
     return props.imports.find((imp) => imp.id === form.import_id);
 });
 
-/**
- * Get selected segment details
- */
 const selectedSegment = computed(() => {
     return props.segments.find((seg) => seg.id === form.segment_id);
 });
 
-/**
- * Get selected device details
- */
 const selectedDevice = computed(() => {
     return props.connectedDevices.find((dev) => dev.id === form.wa_session_id);
 });
 
-/**
- * Check if no devices connected
- */
 const hasNoDevices = computed(
     (): boolean => props.connectedDevices.length === 0,
 );
 
-/**
- * Check if no imports available
- */
 const hasNoImports = computed((): boolean => props.imports.length === 0);
 
-/**
- * Check if no segments available
- */
 const hasNoSegments = computed((): boolean => props.segments.length === 0);
 
-/**
- * Check if no contacts available
- */
 const hasNoContacts = computed((): boolean => props.contacts.length === 0);
 
-/**
- * Calculate total recipient count based on selection type
- */
 const recipientCount = computed((): number => {
     if (form.selection_type === 'import') {
         return selectedImport.value?.valid_rows || 0;
@@ -432,6 +363,19 @@ const recipientCount = computed((): number => {
                         </p>
                     </div>
                 </div>
+
+                <!-- General Error Alert -->
+                <Alert v-if="generalErrors.length > 0" variant="destructive" class="mb-4">
+                    <XCircle class="h-4 w-4" />
+                    <AlertTitle>{{ t('common.error') }}</AlertTitle>
+                    <AlertDescription>
+                        <ul class="list-inside list-disc">
+                            <li v-for="(error, index) in generalErrors" :key="index">
+                                {{ error }}
+                            </li>
+                        </ul>
+                    </AlertDescription>
+                </Alert>
 
                 <!-- No Devices Warning -->
                 <div
@@ -494,6 +438,8 @@ const recipientCount = computed((): number => {
                         </div>
                     </div>
                 </div>
+
+
 
                 <!-- Main Content -->
                 <div
@@ -1318,17 +1264,14 @@ const recipientCount = computed((): number => {
 </template>
 
 <style scoped>
-/* Cairo font for Arabic */
 :root[dir='rtl'] {
     font-family: 'Cairo', sans-serif;
 }
 
-/* Inter font for English */
 :root[dir='ltr'] {
     font-family: 'Inter', sans-serif;
 }
 
-/* Smooth transitions */
 * {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
