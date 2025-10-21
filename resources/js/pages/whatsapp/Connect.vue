@@ -84,7 +84,7 @@ interface Recipient {
 }
 
 const props = defineProps<{
-    sessions: WaSession[];  // Changed from connectedDevices to sessions
+    connectedDevices: WaSession[];  // Change back from sessions
     maxDevices: number;
     imports: Import[];
     segments: Segment[];
@@ -97,7 +97,7 @@ const { t, isRTL } = useTranslation();
 
 const form = useForm({
     name: '',
-    wa_session_id: (props.sessions && props.sessions.length > 0) ? props.sessions[0].id : null,  // Changed to props.sessions
+    wa_session_id: (props.connectedDevices && props.connectedDevices.length > 0) ? props.connectedDevices[0].id : null,
     selection_type: 'import' as 'import' | 'segment' | 'contacts',
     import_id: null as number | null,
     segment_id: null as number | null,
