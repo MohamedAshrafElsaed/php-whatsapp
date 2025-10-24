@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
+
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class WhatsAppGroupsController extends Controller
+class ReportsController extends Controller
 {
     /**
-     * Display WhatsApp Groups page (Coming Soon)
+     * Display Reports page (Coming Soon)
      */
     public function index(Request $request): Response
     {
-        return Inertia::render('whatsapp/Groups');
+        return Inertia::render('reports/Index');
     }
 }
-

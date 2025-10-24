@@ -6,14 +6,13 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class WhatsAppGroupsController extends Controller
+class AutoReplyController extends Controller
 {
     /**
-     * Display WhatsApp Groups page (Coming Soon)
+     * Display Auto Reply page (Coming Soon)
      */
     public function index(Request $request): Response
     {
-        return Inertia::render('whatsapp/Groups');
+        return Inertia::render('whatsapp/AutoReply');
     }
 }
-
